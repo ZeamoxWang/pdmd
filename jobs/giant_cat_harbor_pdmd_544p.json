@@ -1,0 +1,11 @@
+{
+  "examples": [
+    {
+      "task": "t2va",
+      "prompt": "integrated_multimodal_description: [Shot 1] Live-action, photoreal, a low wide view looks along a quiet waterfront promenade of white mid-rise buildings where two tiny pedestrians stop beside a white railing. Behind the roofline, the head of a building-sized orange tabby with a white chest rises gently into view, ears moving first, then green eyes appearing above the buildings in bright afternoon light. The camera tilts up with small amplitude at slow speed, keeping the promenade and people in the foreground while sunlight picks out soft natural fur and the cat blinks slowly with calm curiosity. [Shot 2] At 00:04.000, the camera cuts to a medium-wide view across the harbor as a small white passenger ferry moves slowly past the cat's white front paw resting on an empty stone quay. The cat lowers its head to watch the boat, whiskers shifting in the sea breeze, while the camera tracks with the ferry at matching speed, holding a generous gap between boat and animal as orange reflections ripple in the water. [Shot 3] At 00:09.000, the shot cuts to a wide aerial view of the harbor district where the cat sits upright beside a broad public plaza, its ringed tail curling around an empty circular fountain without touching the buildings while the ferry continues along the same route below. The camera pulls out at slow speed to reveal the whole body and the orderly city around it, and in the final seconds the cat turns its head toward the sea, giving a clean profile against blue sky and open water.\n\noverall_soundscape: Harbor water laps against the quay while gulls call above the promenade and a light sea breeze crosses the railings. The ferry engine holds a low steady diesel rumble, and the cat's movements carry deep soft fur rustles, slow heavy breathing, and a low rolling purr that rises during the final turn.\n\nnon_diegetic_music: A light plucked-string pattern at a moderate tempo with soft woodwind notes and a low pizzicato bass line, holding an even volume throughout.",
+      "duration": 14.0,
+      "aspect_ratio": "16:9",
+      "megapixels": 0.5
+    }
+  ]
+}
