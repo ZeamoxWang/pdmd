@@ -29,7 +29,7 @@ docs, with a few additions:
 |---|---|
 | Transformer | Loaded from a full bf16 checkpoint (for the Turbo LoRA, the LoRA is fused into the bf16 weights first, since it cannot be fused into int8 weights), quantized to int8 (torchao weight-only) at load time, and streamed from CPU to GPU block by block on a CUDA stream |
 | Text encoder | int8 quantization, leaf-level offload |
-| Video VAE | Leaf-level offload, **not resident on the GPU** (keeping it resident makes the FFN activations OOM during denoising); each temporal chunk is decoded as one spatial tile, because every tile re-transfers all decoder weights |
+| Video VAE | Stays on CPU during denoising (keeping it resident makes the FFN activations OOM) and moves to the GPU as a whole only for the decode call. Keeps the default 256px tiling (see [Known issues](#known-issues-and-patches)) |
 | Audio VAE | Resident on the GPU (it is small) |
 
 The weights live mostly in host RAM, so the pod needs about 160Gi of memory.
@@ -116,7 +116,7 @@ The v0.1 4-step LoRA has rank 128 and alpha 8, matching the official script's de
 
 ## Measured on an A10 (Turbo LoRA, 960×544, 345 frames ≈ 14.4 s, 4 NFE)
 
-This run used the default 256px VAE tiling, before the single-tile decoding change.
+This run used leaf-level offload for the VAE, before it was changed to move the whole VAE to the GPU for decoding.
 
 | Stage | Time |
 |---|---|
@@ -127,8 +127,8 @@ This run used the default 256px VAE tiling, before the single-tile decoding chan
 | **Total per video (model already loaded)** | **~57 min**; peak allocated GPU memory 12.4GiB for the whole job (~18.4GB reserved per nvidia-smi) |
 
 Loading is paid once when the worker starts; after that, each video costs denoising + VAE decoding.
-With single-tile decoding, the decoder runs ~20 forwards instead of ~300, so decoding is expected to
-drop to a few minutes (not yet measured).
+Moving the whole VAE to the GPU for the decode call removes the per-layer transfers, so decoding is
+expected to drop to a few minutes (not yet measured).
 
 ## Known issues and patches
 
@@ -138,6 +138,10 @@ drop to a few minutes (not yet measured).
   a synchronous copy for torchao tensors (the speed impact is negligible).
 - **`low_cpu_mem_usage=False`**: the Diffusers docs example passes this argument, but the current
   Diffusers version rejects it when loading with quantization, so it is omitted here.
+- **Do not decode a whole frame as one VAE tile.** The decoder is a ViT whose RoPE normalizes token
+  positions to [-1, 1] over the tile, and it is used with 256px tiles (16×16 latent tokens). Raising
+  the tile size to cover a 1344×768 frame (48×84 tokens) makes the position density far denser than
+  that, and the output shows a grid of misaligned 16px blocks. Keep the default tiling.
 - Text encoding prints many "not executed" warnings for `visual.*` layers: a text-only prompt does
   not go through Qwen3-VL's vision encoder, so these can be ignored.
 
@@ -151,7 +155,7 @@ less efficient than it could be:
 | Loading | Read bf16 → quantize to int8 → pin memory, ~28 min | Read bf16 directly, ~5–10 min |
 | Text encoding | Leaf-level synchronous offload | Whole model on GPU, a few seconds |
 | Denoising | int8 weight-only has to dequantize first; typically 1.2–1.5× slower on long sequences, with a slight quality cost | bf16 |
-| VAE decoding | Leaf-level synchronous offload, bound by PCIe and Python hooks; a faster GPU barely helps | VAE resident on GPU, 1–2 min |
+| VAE decoding | Whole VAE moved to the GPU per decode call | VAE resident on GPU |
 
 So on an 80GB card it still works, but we recommend the official
 `inference_minimax_h3.py --fuse-lora` instead.
