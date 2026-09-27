@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zimo-deployment-h3-a10
+  labels:
+    app: zimo-deployment-h3-a10
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zimo-deployment-h3-a10
+  template:
+    metadata:
+      labels:
+        app: zimo-deployment-h3-a10
+    spec:
+      restartPolicy: Always
+
+      # ✅ 只调度到 A10 节点（排除之前出过问题的节点）
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu.product
+                    operator: In
+                    values:
+                      - NVIDIA-A10
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - gpu-09.nrp.mghpcc.org
+                      - hcc-nrp-shor-c6017.unl.edu
+
+      containers:
+        - name: h3-container
+          image: pytorch/pytorch:2.8.0-cuda12.8-cudnn9-devel
+          imagePullPolicy: IfNotPresent
+          # H3 int8 权重常驻 CPU 内存（~75GB），融合 LoRA 时 bf16 transformer 需要 ~62GB
+          resources:
+            limits:
+              memory: 160Gi
+              cpu: 16000m
+              nvidia.com/gpu: 1
+              ephemeral-storage: "50Gi"
+            requests:
+              memory: 160Gi
+              cpu: 16000m
+              nvidia.com/gpu: 1
+              ephemeral-storage: "50Gi"
+          env:
+            - name: HF_HOME
+              value: /pv/h3/hf_cache
+            - name: HF_XET_HIGH_PERFORMANCE
+              value: "1"
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "=== H3 A10 container ==="
+              nvidia-smi || echo "GPU not detected"
+              apt-get update -qq && apt-get install -y -qq git ffmpeg > /dev/null
+              # torchao 最新版需要 torch >= 2.11，镜像自带的 2.8 要先升级
+              pip install -q -U torch torchvision torchaudio
+              pip install -q "git+https://github.com/huggingface/diffusers.git" \
+                transformers accelerate peft torchao safetensors av \
+                huggingface_hub pillow numpy
+              touch /tmp/deps_ready
+              echo "=== deps ready ==="
+              tail -f /dev/null
+          volumeMounts:
+            - mountPath: /pv
+              name: zmw-vol-haosu
+            - mountPath: /dev/shm
+              name: dshm
+
+      volumes:
+        - name: zmw-vol-haosu
+          persistentVolumeClaim:
+            claimName: zmw-vol-haosu
+
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi
