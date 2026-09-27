@@ -76,7 +76,9 @@ described by a jobs JSON. It needs a checkout of
 audio/video muxing. On any Linux machine with a 24GB GPU and 128GB of RAM:
 
 The 4-NFE and 2-NFE checkpoints are independent; each only needs the base model. To run only
-2 NFE, skip the `pdmd_4NFE_full` download and the 4-NFE command below.
+2 NFE, skip the `pdmd_4NFE_full` download and the 4-NFE command below. The 2-NFE LoRA is fused
+into the original (non-LoRA) transformer, `transformer/` of `MiniMaxAI/MiniMax-H3` (~62GB), which
+the base model download already includes; `fuse_lora_fp32.py` finds it in the Hugging Face cache.
 
 ```bash
 # Environment (the versions verified on the A10)
