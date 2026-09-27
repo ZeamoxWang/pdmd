@@ -133,17 +133,19 @@ for sub in ("done", "failed"):
 
 
 def run_jobs_file(jobs_json):
-    # Each example may override the startup shifts with video_shift / audio_shift
+    # Each example may override the startup shifts (video_shift / audio_shift) and the
+    # step count (inference_steps)
     examples = json.loads(jobs_json.read_text())["examples"]
     for index, job in enumerate(build_jobs(jobs_json)):
         width, height = resolve_output_size(job.megapixels, job.aspect_ratio)
         seed = args.seed + index
         video_shift = float(examples[index].get("video_shift", args.video_shift))
         audio_shift = float(examples[index].get("audio_shift", args.audio_shift))
+        steps = int(examples[index].get("inference_steps", args.inference_steps))
         pipe.scheduler.set_shift(video_shift)
         pipe.audio_scheduler.set_shift(audio_shift)
         log(f"{jobs_json.name} job {index}: {width}x{height}, {job.num_frames} frames, "
-            f"{args.inference_steps} NFE, shifts video={video_shift:g} audio={audio_shift:g}, "
+            f"{steps} NFE, shifts video={video_shift:g} audio={audio_shift:g}, "
             f"seed {seed}")
         torch.cuda.reset_peak_memory_stats()
         with torch.inference_mode():
@@ -153,13 +155,13 @@ def run_jobs_file(jobs_json):
                 width=width,
                 num_frames=job.num_frames,
                 # The scheduler counts the terminal sigma=0 as a grid point, so N NFEs need N + 1
-                num_inference_steps=args.inference_steps + 1,
+                num_inference_steps=steps + 1,
                 generator=torch.Generator().manual_seed(seed),
                 output_type="np",
                 output=["videos", "audio", "sampling_rate"],
             )
         output_path = args.output_dir / (
-            f"{jobs_json.stem}_{index:02d}_{args.inference_steps}nfe"
+            f"{jobs_json.stem}_{index:02d}_{steps}nfe"
             f"_vs{video_shift:g}_as{audio_shift:g}_seed{seed}.mp4"
         )
         save_result_video(result, output_path, FPS)

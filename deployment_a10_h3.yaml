@@ -68,12 +68,13 @@ spec:
                 transformers==5.17.0 accelerate==1.15.0 peft==0.21.0 torchao==0.18.0 \
                 safetensors==0.8.0 av==18.1.0 huggingface_hub==1.33.0 pillow numpy
               echo "=== deps ready, starting worker ==="
-              # The worker stays up polling /pv/h3/queue; if it exits, the container exits and k8s restarts it
+              # The worker stays up polling /pv/h3/queue; if it exits, the container exits and k8s restarts it.
+              # Worker arguments come from /pv/h3/serve_args, so switching the served model only needs
+              # an edit of that file and a worker restart.
               cd /pv/h3
-              python run_a10.py \
-                --transformer-path /pv/h3/weights/pdmd_zwang000_s3500 \
-                --inference-steps 4 --video-shift 12 --audio-shift 3 \
-                2>&1 | tee -a /pv/h3/run.log
+              test -f serve_args || echo "--transformer-path /pv/h3/weights/pdmd_zwang000_s3500 --inference-steps 4 --video-shift 12 --audio-shift 3" > serve_args
+              echo "serve_args: $(cat serve_args)"
+              python run_a10.py $(cat serve_args) 2>&1 | tee -a /pv/h3/run.log
           volumeMounts:
             - mountPath: /pv
               name: zmw-vol-haosu
