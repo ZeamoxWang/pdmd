@@ -148,7 +148,7 @@ follows the 24–32GB recipe of the Diffusers docs, with a few additions:
 
 | Stage | 4 NFE | 2 NFE |
 |---|---|---|
-| Load + int8 quantization + offload setup (once per worker start) | ~25–28 min | ~25–28 min |
+| Load + int8 quantization + offload setup (once per process start) | ~25–28 min | ~25–28 min |
 | Denoising | ~25.5 min (~6.4 min/step) | ~13 min |
 | VAE decoding + muxing | ~5 min | ~5 min |
 | **Per video, model already loaded** | **~31 min** | **~16–19 min** |
