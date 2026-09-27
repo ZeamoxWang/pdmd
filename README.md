@@ -1,69 +1,72 @@
-# MiniMax-H3 Turbo LoRA：单张 24GB 显卡推理
+# MiniMax-H3 Turbo LoRA on a single 24GB GPU
 
-在 **单张 24GB 显存的 GPU**（NRP Nautilus 上的 NVIDIA A10）上跑
-[MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) +
-[Turbo LoRA](https://github.com/ModelTC/Minimax-H3-Turbo)（FL2VA Turbo 4-step v0.1）的配置和脚本。
+Configs and scripts for running [MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) with the
+[Turbo LoRA](https://github.com/ModelTC/Minimax-H3-Turbo) (FL2VA Turbo 4-step v0.1) on a **single
+GPU with 24GB of VRAM** (an NVIDIA A10 on the NRP Nautilus cluster).
 
-> ⚠️ **这个版本是专门针对 24GB 显存优化的。**
+> ⚠️ **This version is optimized for 24GB of VRAM.**
 >
-> 如果在 **80GB 显存的卡**（A100 80G / H100 等）上，**不应该用这个脚本**。更合适的是
-> Turbo 仓库的官方脚本 [`inference_minimax_h3.py`](https://github.com/ModelTC/Minimax-H3-Turbo/blob/main/inference_minimax_h3.py)
-> 加上 `--fuse-lora`：它默认用 `ComponentsManager` 的自动 offload，按组件整体搬上/搬下 GPU，
-> 保持 bf16 精度。本仓库为了挤进 24GB 做的 int8 量化和细粒度 offload，在 80GB 卡上只会
-> 带来额外的加载时间、更慢的 VAE 解码和轻微的画质损失（见下文"80GB 卡上的效率"）。
+> On an **80GB card** (A100 80G, H100, etc.), this script still works, but **it is not
+> recommended**. The better choice there is the Turbo repo's official
+> [`inference_minimax_h3.py`](https://github.com/ModelTC/Minimax-H3-Turbo/blob/main/inference_minimax_h3.py)
+> with `--fuse-lora`. It uses `ComponentsManager` automatic offload by default, which moves whole
+> components on and off the GPU and keeps bf16 precision. The int8 quantization and fine-grained
+> offloading used here to fit into 24GB only add loading time, slow down VAE decoding, and cost a
+> little quality on an 80GB card (see [Efficiency on 80GB cards](#efficiency-on-80gb-cards)).
 
-## 为什么需要特殊处理
+## Why special handling is needed
 
-H3 的 transformer 在 bf16 下是 61.7GB，Qwen3-VL-32B 文本编码器是 62.1GB，直接跑的显存峰值在
-50GB 以上。这里采用 Diffusers 文档里 24–32GB 显卡的方案，并做了几处补充：
+In bf16, the H3 transformer is 61.7GB and the Qwen3-VL-32B text encoder is 62.1GB, and running it
+unoptimized peaks above 50GB of VRAM. This repo follows the 24–32GB recipe from the Diffusers
+docs, with a few additions:
 
-| 组件 | 处理方式 |
+| Component | Handling |
 |---|---|
-| Transformer | 先把 Turbo LoRA 融合进 bf16 权重（int8 权重无法直接 fuse），加载时量化为 int8（torchao weight-only），按 block 用 CUDA stream 从 CPU 流式搬到 GPU |
-| 文本编码器 | int8 量化，leaf 级 offload |
-| 视频 VAE | leaf 级 offload，**不常驻 GPU**，否则去噪时 FFN 激活值会 OOM |
-| 音频 VAE | 常驻 GPU（很小） |
+| Transformer | The Turbo LoRA is first fused into the bf16 weights (it cannot be fused into int8 weights), then quantized to int8 (torchao weight-only) at load time and streamed from CPU to GPU block by block on a CUDA stream |
+| Text encoder | int8 quantization, leaf-level offload |
+| Video VAE | Leaf-level offload, **not resident on the GPU**; keeping it resident makes the FFN activations OOM during denoising |
+| Audio VAE | Resident on the GPU (it is small) |
 
-权重主要常驻在 CPU 内存里，pod 需要约 160Gi 内存。
+The weights live mostly in host RAM, so the pod needs about 160Gi of memory.
 
-## 文件
+## Files
 
-| 文件 | 作用 |
+| File | Purpose |
 |---|---|
-| `deployment_a10_h3.yaml` | Nautilus deployment：1 张 A10、160Gi 内存、挂载 `zmw-vol-haosu` PVC 到 `/pv` |
-| `fuse_lora.py` | 一次性把 Turbo LoRA 融合进 bf16 transformer 并存盘（CPU 上完成，约 20 分钟） |
-| `run_a10.py` | 常驻推理 worker：模型只加载一次，之后轮询队列目录执行任务 |
-| `jobs/giant_cat_harbor.json` | 示例任务（14 秒、三个镜头的 T2VA prompt） |
+| `deployment_a10_h3.yaml` | Nautilus deployment: 1× A10, 160Gi RAM, `zmw-vol-haosu` PVC mounted at `/pv` |
+| `fuse_lora.py` | One-off: fuses the Turbo LoRA into the bf16 transformer and saves it (runs on CPU, ~20 min) |
+| `run_a10.py` | Persistent inference worker: loads the model once, then polls a queue directory for jobs |
+| `jobs/giant_cat_harbor.json` | Example job (a 14-second, three-shot T2VA prompt) |
 
-## 使用方法
+## Usage
 
-所有路径都在 PVC 上的 `/pv/h3` 下。
+All paths below live on the PVC under `/pv/h3`.
 
-### 1. 启动 pod
+### 1. Start the pod
 
 ```bash
 kubectl apply -f deployment_a10_h3.yaml
 ```
 
-启动命令会安装依赖。**注意 torch 需要 ≥ 2.11**，最新版 torchao 在镜像自带的 torch 2.8 上无法 import；
-yaml 里已经先升级 torch。
+The startup command installs the dependencies. **torch must be ≥ 2.11**: the latest torchao fails to
+import on the torch 2.8 that ships with the base image, so the yaml upgrades torch first.
 
-### 2. 准备代码和权重
+### 2. Fetch code and weights
 
 ```bash
-# 在 pod 里
+# inside the pod
 export HF_HOME=/pv/h3/hf_cache
 git clone --depth 1 https://github.com/ModelTC/Minimax-H3-Turbo.git /pv/h3/Minimax-H3-Turbo
 hf download lightx2v/Minimax-h3-Turbo minimax_h3_fl2v_turbo_4step_v0.1.safetensors --local-dir /pv/h3/loras
 hf download MiniMaxAI/MiniMax-H3 --exclude "transformer_ref/*"
 ```
 
-把本仓库的 `fuse_lora.py`、`run_a10.py` 拷到 `/pv/h3/`（例如用 `kubectl cp`）。
+Copy `fuse_lora.py` and `run_a10.py` from this repo to `/pv/h3/` (e.g. with `kubectl cp`).
 
-> 基础模型仓库里还带有原始格式的 `FL2VA/`、`Ref2VA/` 目录（约 124GB），Diffusers 用不到，
-> 可以在下载时一并 `--exclude`。
+> The base model repo also ships original-format `FL2VA/` and `Ref2VA/` directories (~124GB) that
+> Diffusers does not use; you can add them to `--exclude` as well.
 
-### 3. 融合 LoRA（只需一次）
+### 3. Fuse the LoRA (once)
 
 ```bash
 cd /pv/h3
@@ -73,9 +76,9 @@ python fuse_lora.py \
   --output /pv/h3/transformer_turbo4step_v0.1_fused
 ```
 
-v0.1 4-step LoRA 的 rank 是 128、alpha 是 8（与官方脚本默认值一致）。
+The v0.1 4-step LoRA has rank 128 and alpha 8, matching the official script's default.
 
-### 4. 启动推理 worker
+### 4. Start the inference worker
 
 ```bash
 cd /pv/h3
@@ -85,53 +88,54 @@ nohup python run_a10.py \
   --inference-steps 4 > run.log 2>&1 &
 ```
 
-加载完成后日志会出现 `watching /pv/h3/queue`。
+Once loading finishes, the log prints `watching /pv/h3/queue`.
 
-### 5. 提交任务
+### 5. Submit jobs
 
-把 jobs JSON（格式同 Turbo 仓库的 `examples/prompts_t2va_test.json`）放进队列目录：
+Drop a jobs JSON (same format as `examples/prompts_t2va_test.json` in the Turbo repo) into the queue
+directory:
 
 ```bash
 cp jobs/giant_cat_harbor.json /pv/h3/queue/
 ```
 
-- 成功：视频写到 `/pv/h3/outputs/`，JSON 移到 `queue/done/`
-- 失败（例如 OOM）：JSON 移到 `queue/failed/`，worker 继续等待下一个任务，**不需要重新加载模型**
+- On success, the video is written to `/pv/h3/outputs/` and the JSON moves to `queue/done/`.
+- On failure (e.g. OOM), the JSON moves to `queue/failed/` and the worker keeps waiting for the next
+  job, **without reloading the model**.
 
-## A10 实测（960×544，345 帧 ≈ 14.4 秒，4 NFE）
+## Measured on an A10 (960×544, 345 frames ≈ 14.4 s, 4 NFE)
 
-| 阶段 | 耗时 |
+| Stage | Time |
 |---|---|
-| 加载 + int8 量化 | 约 23.5 分钟 |
-| offload 准备（pinned memory） | 约 4–8 分钟 |
-| 4 步去噪 | 7 分 28 秒（约 112 秒/步），显存约 18.4GB |
-| VAE 解码 | 很慢（实测超过 17 分钟），瓶颈是 leaf 级 offload 的逐层同步搬运 |
+| Loading + int8 quantization | ~23.5 min |
+| Offload setup (pinned memory) | ~4–8 min |
+| 4 denoising steps | 7 min 28 s (~112 s/step), ~18.4GB VRAM |
+| VAE decoding | Slow (over 17 min measured); the bottleneck is synchronous layer-by-layer transfer under leaf-level offload |
 
-加载只在 worker 启动时付一次；之后每条视频的耗时是去噪 + VAE 解码。
+Loading is paid once when the worker starts; after that, each video costs denoising + VAE decoding.
 
-## 已知问题与补丁
+## Known issues and patches
 
-- **torchao int8 + group offload stream**：Diffusers 的 group offload 开启 `use_stream` 后会调用
-  `tensor.to(device, non_blocking=True)`，torchao 的 int8 tensor 只接受 `dtype/layout/device`，
-  会触发 `AssertionError`。`run_a10.py` 开头对 torchao tensor 改用同步拷贝（对速度影响可忽略）。
-- **`low_cpu_mem_usage=False`**：Diffusers 文档示例里带了这个参数，但当前 Diffusers 版本在量化加载时
-  会直接报错，这里已经去掉。
-- 文本编码时会打印大量 `visual.*` 层 "not executed" 的警告：纯文本 prompt 不经过 Qwen3-VL 的视觉编码器，可以忽略。
+- **torchao int8 + group offload stream**: with `use_stream` enabled, Diffusers group offloading
+  calls `tensor.to(device, non_blocking=True)`, but torchao int8 tensors only accept
+  `dtype/layout/device` and raise an `AssertionError`. `run_a10.py` patches this at the top by using
+  a synchronous copy for torchao tensors (the speed impact is negligible).
+- **`low_cpu_mem_usage=False`**: the Diffusers docs example passes this argument, but the current
+  Diffusers version rejects it when loading with quantization, so it is omitted here.
+- Text encoding prints many "not executed" warnings for `visual.*` layers: a text-only prompt does
+  not go through Qwen3-VL's vision encoder, so these can be ignored.
 
-## 80GB 卡上的效率
+## Efficiency on 80GB cards
 
-本脚本在 80GB 卡上**可以正常运行**（没有依赖显存大小的逻辑），但效率明显低于应有水平：
+This script **runs fine** on an 80GB card (nothing in it depends on VRAM size), but it is noticeably
+less efficient than it could be:
 
-| 阶段 | 本脚本 | 80GB 卡的合理做法 |
+| Stage | This script | Reasonable approach on 80GB |
 |---|---|---|
-| 加载 | bf16 读取 → int8 量化 → pinned memory，约 28 分钟 | 直接 bf16 读取，约 5–10 分钟 |
-| 文本编码 | leaf 级同步 offload | 整体上 GPU，几秒 |
-| 去噪 | int8 weight-only 需要先反量化，长序列下通常慢 1.2–1.5 倍，画质有轻微损失 | bf16 |
-| VAE 解码 | leaf 级同步 offload，瓶颈在 PCIe 和 Python hook，换更快的 GPU 也不会快多少 | VAE 常驻 GPU，1–2 分钟 |
+| Loading | Read bf16 → quantize to int8 → pin memory, ~28 min | Read bf16 directly, ~5–10 min |
+| Text encoding | Leaf-level synchronous offload | Whole model on GPU, a few seconds |
+| Denoising | int8 weight-only has to dequantize first; typically 1.2–1.5× slower on long sequences, with a slight quality cost | bf16 |
+| VAE decoding | Leaf-level synchronous offload, bound by PCIe and Python hooks; a faster GPU barely helps | VAE resident on GPU, 1–2 min |
 
-所以在 80GB 卡上请使用官方的 `inference_minimax_h3.py --fuse-lora`。
-
-## 许可
-
-MiniMax-H3 使用 MiniMax H3 Community License，美国、欧盟、英国、韩国不在默认授权范围内，
-需要先通过 [MiniMax 的授权申请](https://platform.minimax.io/h3-license)。
+So on an 80GB card it still works, but we recommend the official
+`inference_minimax_h3.py --fuse-lora` instead.
