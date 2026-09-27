@@ -75,6 +75,9 @@ described by a jobs JSON. It needs a checkout of
 [ModelTC/Minimax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo) for job parsing and
 audio/video muxing. On any Linux machine with a 24GB GPU and 128GB of RAM:
 
+The 4-NFE and 2-NFE checkpoints are independent; each only needs the base model. To run only
+2 NFE, skip the `pdmd_4NFE_full` download and the 4-NFE command below.
+
 ```bash
 # Environment (the versions verified on the A10)
 pip install torch==2.14.0 torchvision==0.29.0 torchaudio==2.11.0
@@ -84,8 +87,9 @@ pip install "git+https://github.com/huggingface/diffusers.git@e0abab83b5df05de9e
 git clone https://github.com/ModelTC/Minimax-H3-Turbo.git
 git -C Minimax-H3-Turbo checkout 02e26d591f7a04d5d1a074c9566d5dd4f22f6225
 
-# Base model (text encoder, VAEs, schedulers, base transformer) and PDMD checkpoints
+# Base model (text encoder, VAEs, schedulers, base transformer), needed by both
 hf download MiniMaxAI/MiniMax-H3 --exclude "transformer_ref/*" "FL2VA/*" "Ref2VA/*"
+# PDMD checkpoints: download only the one(s) you run
 hf download pdmd2026/pdmd_4NFE_full --local-dir ckpt/pdmd_4NFE_full
 hf download pdmd2026/pdmd_2NFE_lora --local-dir ckpt/pdmd_2NFE_lora
 
@@ -121,8 +125,10 @@ under `k8s/`, and, if you like, the resource names (`zimo-...`). The tools read 
 names from `GPU_DEPLOY` / `DEPLOY`.
 
 ```bash
-# 1. Publish worker/ as a ConfigMap (mounted at /opt/h3 in the pods)
+# 1. Publish worker/ as a ConfigMap (mounted at /opt/h3 in the pods), and start the small CPU
+#    pod used for downloads and for choosing the model
 tools/upload_scripts.sh
+kubectl apply -f k8s/deployment_cpu.yaml
 
 # 2. One-off setup on CPU (~1 h): base model, PDMD checkpoints, fused 2-NFE transformer
 kubectl apply -f k8s/setup_job.yaml
@@ -135,7 +141,6 @@ kubectl logs -f deploy/zimo-deployment-h3-a10
 
 # 4. Generate and download the 4-NFE video (~31 min)
 tools/submit.sh jobs/giant_cat_harbor_768p_4nfe.json
-kubectl apply -f k8s/deployment_cpu.yaml   # small CPU pod used for downloads
 tools/fetch.sh giant_cat_harbor_768p_4nfe_00_4nfe_seed42.mp4 outputs/
 
 # 5. Switch to the 2-NFE checkpoint (the worker reloads, ~30 min), then generate (~17 min)
@@ -144,6 +149,21 @@ tools/submit.sh jobs/giant_cat_harbor_768p_2nfe.json
 tools/fetch.sh giant_cat_harbor_768p_2nfe_00_2nfe_seed42.mp4 outputs/
 
 # 6. Release the GPU when done (Nautilus flags idle GPU pods)
+kubectl delete -f k8s/deployment_a10_h3.yaml
+```
+
+**Only 2 NFE.** The 4-NFE run is not a prerequisite. Set `MODELS` to `"2nfe"` in
+`k8s/setup_job.yaml` (it then skips the 66GB 4-NFE download), and choose the model before the GPU
+worker starts, so it loads only once:
+
+```bash
+tools/upload_scripts.sh
+kubectl apply -f k8s/deployment_cpu.yaml
+kubectl apply -f k8s/setup_job.yaml          # with MODELS: "2nfe"
+tools/switch_model.sh 2nfe                   # worker not running yet: only writes serve_args
+kubectl apply -f k8s/deployment_a10_h3.yaml
+tools/submit.sh jobs/giant_cat_harbor_768p_2nfe.json
+tools/fetch.sh giant_cat_harbor_768p_2nfe_00_2nfe_seed42.mp4 outputs/
 kubectl delete -f k8s/deployment_a10_h3.yaml
 ```
 

@@ -25,6 +25,9 @@ spec:
               cpu: 8000m
               ephemeral-storage: "20Gi"
           env:
+            # Checkpoints to prepare: "4nfe 2nfe", "4nfe" or "2nfe"; the first is served by default
+            - name: MODELS
+              value: "4nfe 2nfe"
             - name: HF_XET_HIGH_PERFORMANCE
               value: "1"
           command: ["/bin/bash", "-c"]
