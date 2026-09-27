@@ -111,7 +111,7 @@ cp jobs/giant_cat_harbor.json /pv/h3/queue/
 | Offload setup (pinned memory) | ~4–8 min |
 | 4 denoising steps | 7 min 28 s (~112 s/step), ~18.4GB VRAM |
 | VAE decoding + muxing | ~48 min; the bottleneck is synchronous layer-by-layer transfer under leaf-level offload (~300 decoder forwards: 20 temporal chunks × 15 spatial tiles), not compute |
-| **Total per video (model already loaded)** | **~57 min**, peak VAE-stage GPU memory 12.4GB |
+| **Total per video (model already loaded)** | **~57 min**; peak allocated GPU memory 12.4GiB for the whole job (~18.4GB reserved per nvidia-smi) |
 
 Loading is paid once when the worker starts; after that, each video costs denoising + VAE decoding.
 
