@@ -55,9 +55,9 @@ parser.add_argument("--transformer-path", type=Path, required=True)
 parser.add_argument("--inference-steps", type=int, default=4)
 parser.add_argument("--jobs-json", type=Path, nargs="+", default=None,
                     help="Run these job files once and exit instead of polling --queue-dir.")
-parser.add_argument("--queue-dir", type=Path, default=Path("/pv/h3/queue"))
-parser.add_argument("--output-dir", type=Path, default=Path("/pv/h3/outputs"))
-parser.add_argument("--turbo-repo", type=Path, default=Path("/pv/h3/Minimax-H3-Turbo"),
+parser.add_argument("--queue-dir", type=Path, default=Path("queue"))
+parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
+parser.add_argument("--turbo-repo", type=Path, default=Path("Minimax-H3-Turbo"),
                     help="Checkout of ModelTC/Minimax-H3-Turbo (job parsing and muxing helpers).")
 parser.add_argument("--seed", type=int, default=42)
 args = parser.parse_args()

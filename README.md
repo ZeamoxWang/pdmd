@@ -2,17 +2,17 @@
 
 Inference for the official **PDMD** (Projected Distribution Matching Distillation) checkpoints of
 [MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) joint video–audio generation, on a
-**single GPU with 24GB of VRAM** (an NVIDIA A10 on the NRP Nautilus Kubernetes cluster).
+**single GPU with 24GB of VRAM** (tested on an NVIDIA A10).
 
 > ⚠️ **This version is optimized for GPUs without enough VRAM, and trades that for high host
 > memory.**
 >
 > - **GPU:** 24GB is enough. Peak allocated GPU memory is ~21GiB at 1344×768 (~22GB in
 >   `nvidia-smi`), which is close to the A10's limit.
-> - **Host RAM: 128Gi** (the pod request we verified; the first runs used 160Gi). The int8
->   weights live in host RAM (~52GiB resident), and loading memory-maps the bf16 checkpoints on
->   top of that. The pod also needs 8 CPU cores.
-> - **Speed:** loading and quantizing the model takes ~25–30 min, once per worker start.
+> - **Host RAM: 128GB** (verified; our first runs used 160GB). The int8 weights live in host RAM
+>   (~52GiB resident), and loading memory-maps the bf16 checkpoints on top of that. We used 8 CPU
+>   cores.
+> - **Speed:** loading and quantizing the model takes ~25–30 min, once per process start.
 >
 > On an **80GB card** (A100 80G, H100, etc.), this code still works, but **it is not
 > recommended**. The better choice there is to keep bf16 and let `ComponentsManager` automatic
@@ -111,72 +111,11 @@ python worker/run_a10.py \
 ```
 
 The videos are written as `outputs/<job name>_<index>_<N>nfe_seed<seed>.mp4`. Each command loads
-the model (~25–30 min) before generating; to avoid paying that per video, omit `--jobs-json` and
-the script keeps running as a worker that polls `--queue-dir` for job files. That worker mode is
-what the Kubernetes deployment below runs, with its arguments read from `/pv/h3/serve_args`:
+the model (~25–30 min) before generating. To avoid paying that for every video, pass several files
+to `--jobs-json`, or omit it and the script keeps running as a worker that polls `--queue-dir` for
+job files (finished ones move to `done/`, failed ones such as OOMs to `failed/`).
 
-```bash
-python /opt/h3/run_a10.py --transformer-path /pv/h3/ckpt/pdmd_4NFE_full --inference-steps 4
-```
-
-## Reproduce our test on Nautilus
-
-The steps below run everything on the cluster; all data lives on a PVC mounted at `/pv`, under
-`/pv/h3`. Before starting, set the PVC name (`claimName`, here `zmw-vol-haosu`) in the three files
-under `k8s/`, and, if you like, the resource names (`zimo-...`). The tools read the deployment
-names from `GPU_DEPLOY` / `DEPLOY`.
-
-```bash
-# 1. Publish worker/ as a ConfigMap (mounted at /opt/h3 in the pods), and start the small CPU
-#    pod used for downloads and for choosing the model
-tools/upload_scripts.sh
-kubectl apply -f k8s/deployment_cpu.yaml
-
-# 2. One-off setup on CPU (~1 h): base model, PDMD checkpoints, fused 2-NFE transformer
-kubectl apply -f k8s/setup_job.yaml
-kubectl logs -f job/zimo-h3-setup
-
-# 3. Start the GPU worker; it serves the 4-NFE checkpoint by default and is ready when the log
-#    prints "watching /pv/h3/queue" (~30 min)
-kubectl apply -f k8s/deployment_a10_h3.yaml
-kubectl logs -f deploy/zimo-deployment-h3-a10
-
-# 4. Generate and download the 4-NFE video (~31 min)
-tools/submit.sh jobs/giant_cat_harbor_768p_4nfe.json
-tools/fetch.sh giant_cat_harbor_768p_4nfe_00_4nfe_seed42.mp4 outputs/
-
-# 5. Switch to the 2-NFE checkpoint (the worker reloads, ~30 min), then generate (~17 min)
-tools/switch_model.sh 2nfe
-tools/submit.sh jobs/giant_cat_harbor_768p_2nfe.json
-tools/fetch.sh giant_cat_harbor_768p_2nfe_00_2nfe_seed42.mp4 outputs/
-
-# 6. Release the GPU when done (Nautilus flags idle GPU pods)
-kubectl delete -f k8s/deployment_a10_h3.yaml
-```
-
-**Only 2 NFE.** The 4-NFE run is not a prerequisite. Set `MODELS` to `"2nfe"` in
-`k8s/setup_job.yaml` (it then skips the 66GB 4-NFE download), and choose the model before the GPU
-worker starts, so it loads only once:
-
-```bash
-tools/upload_scripts.sh
-kubectl apply -f k8s/deployment_cpu.yaml
-kubectl apply -f k8s/setup_job.yaml          # with MODELS: "2nfe"
-tools/switch_model.sh 2nfe                   # worker not running yet: only writes serve_args
-kubectl apply -f k8s/deployment_a10_h3.yaml
-tools/submit.sh jobs/giant_cat_harbor_768p_2nfe.json
-tools/fetch.sh giant_cat_harbor_768p_2nfe_00_2nfe_seed42.mp4 outputs/
-kubectl delete -f k8s/deployment_a10_h3.yaml
-```
-
-- A job that fails (e.g. OOM) moves to `/pv/h3/queue/failed/` and the worker keeps waiting for the
-  next one; a finished job moves to `queue/done/`.
-- If the worker crashes, its container exits and Kubernetes restarts it with the same
-  `/pv/h3/serve_args`.
-- After editing anything in `worker/`, rerun `tools/upload_scripts.sh` and restart the worker
-  (`tools/switch_model.sh <current model>`).
-
-### Test settings
+## Test settings
 
 Both test jobs use the same three-shot prompt (`jobs/*.json`): a building-sized orange tabby
 over a harbor promenade, with soundscape and music descriptions.
@@ -219,29 +158,10 @@ follows the 24–32GB recipe of the Diffusers docs, with a few additions:
 
 | Path | Purpose |
 |---|---|
-| `worker/run_a10.py` | Inference: runs the given `--jobs-json` files once, or keeps running as a worker that polls a queue directory |
+| `worker/run_a10.py` | Inference: runs the given `--jobs-json` files, or keeps running as a worker that polls a queue directory |
 | `worker/fuse_lora_fp32.py` | Fuses the 2-NFE LoRA into the base transformer in fp32 |
-| `worker/setup_pv.sh` | One-off, re-runnable preparation of `/pv/h3` |
-| `k8s/setup_job.yaml` | CPU Job that runs `setup_pv.sh` |
-| `k8s/deployment_a10_h3.yaml` | GPU worker: 1× A10, 128Gi RAM, 8 CPUs, pinned dependency versions |
-| `k8s/deployment_cpu.yaml` | Small CPU pod for browsing and downloading files on the PVC |
-| `tools/*.sh` | Local helpers: publish scripts, switch model, submit a job, fetch a video |
 | `jobs/*.json` | The test jobs |
-
-Layout of `/pv/h3` after setup:
-
-```
-/pv/h3/
-├── hf_cache/                   # MiniMax-H3 base model (HF cache)
-├── Minimax-H3-Turbo/           # helper code for job parsing and muxing (pinned commit)
-├── ckpt/pdmd_4NFE_full/        # 4-NFE transformer
-├── ckpt/pdmd_2NFE_lora/        # 2-NFE LoRA
-├── ckpt/pdmd_2NFE_fused/       # 2-NFE LoRA fused into the base transformer
-├── serve_args                  # worker arguments (served checkpoint, default step count)
-├── queue/{done,failed}/        # job queue
-├── outputs/                    # generated videos
-└── run.log                     # worker log
-```
+| `k8s/`, `tools/`, `worker/setup_pv.sh` | Optional: the Kubernetes setup we used to run the tests |
 
 ## Known issues and patches
 
@@ -255,11 +175,6 @@ Layout of `/pv/h3` after setup:
   positions to [-1, 1] over the tile, and it is used with 256px tiles (16×16 latent tokens).
   Enlarging the tile to cover a 1344×768 frame makes the position density far denser and the output
   shows a grid of misaligned 16px blocks. Keep the default tiling.
-- **Scheduling**: the deployment uses the `Recreate` strategy, because a rolling update needs a
-  second A10 while the old pod still holds one. Larger requests (160Gi / 16 CPUs) can stay
-  `Pending` when the cluster is busy.
-- **Copying files out**: `kubectl cp` and long `kubectl exec` streams tend to drop after ~1.5MB, so
-  `tools/fetch.sh` copies in md5-checked chunks.
 - Text encoding prints many "not executed" warnings for `visual.*` layers: a text-only prompt does
   not go through Qwen3-VL's vision encoder, so these can be ignored.
 
