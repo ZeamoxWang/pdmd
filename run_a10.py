@@ -8,6 +8,7 @@ leaf 级 offload。transformer 使用 fuse_lora.py 预先融合好 Turbo LoRA �
 被执行，完成后移到 done/，失败（例如 OOM）移到 failed/，进程继续等待下一个任务。
 """
 import argparse
+import json
 import shutil
 import sys
 import time
@@ -119,11 +120,18 @@ for sub in ("done", "failed"):
 
 
 def run_jobs_file(jobs_json):
+    # 每个 example 可以用 video_shift / audio_shift 覆盖启动参数里的 shift
+    examples = json.loads(jobs_json.read_text())["examples"]
     for index, job in enumerate(build_jobs(jobs_json)):
         width, height = resolve_output_size(job.megapixels, job.aspect_ratio)
         seed = args.seed + index
+        video_shift = float(examples[index].get("video_shift", args.video_shift))
+        audio_shift = float(examples[index].get("audio_shift", args.audio_shift))
+        pipe.scheduler.set_shift(video_shift)
+        pipe.audio_scheduler.set_shift(audio_shift)
         log(f"{jobs_json.name} job {index}: {width}x{height}, {job.num_frames} frames, "
-            f"{args.inference_steps} NFE, seed {seed}")
+            f"{args.inference_steps} NFE, shifts video={video_shift:g} audio={audio_shift:g}, "
+            f"seed {seed}")
         torch.cuda.reset_peak_memory_stats()
         with torch.inference_mode():
             result = pipe(
@@ -138,7 +146,8 @@ def run_jobs_file(jobs_json):
                 output=["videos", "audio", "sampling_rate"],
             )
         output_path = args.output_dir / (
-            f"{jobs_json.stem}_{index:02d}_{args.inference_steps}nfe_seed{seed}.mp4"
+            f"{jobs_json.stem}_{index:02d}_{args.inference_steps}nfe"
+            f"_vs{video_shift:g}_as{audio_shift:g}_seed{seed}.mp4"
         )
         save_result_video(result, output_path, FPS)
         log(f"saved {output_path}, peak GPU mem "
