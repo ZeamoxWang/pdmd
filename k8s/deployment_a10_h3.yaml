@@ -74,15 +74,18 @@ spec:
               # The worker stays up polling /pv/h3/queue; if it exits, the container exits and k8s restarts it.
               # Worker arguments come from /pv/h3/serve_args, so switching the served model only needs
               # an edit of that file and a worker restart.
+              # The worker script comes from the h3-scripts ConfigMap (tools/upload_scripts.sh).
               cd /pv/h3
-              test -f serve_args || echo "--transformer-path /pv/h3/weights/pdmd_zwang000_s3500 --inference-steps 4 --video-shift 12 --audio-shift 3" > serve_args
+              test -f serve_args || echo "--transformer-path /pv/h3/ckpt/pdmd_4NFE_full --inference-steps 4" > serve_args
               echo "serve_args: $(cat serve_args)"
-              python run_a10.py $(cat serve_args) 2>&1 | tee -a /pv/h3/run.log
+              python /opt/h3/run_a10.py $(cat serve_args) 2>&1 | tee -a /pv/h3/run.log
           volumeMounts:
             - mountPath: /pv
               name: zmw-vol-haosu
             - mountPath: /dev/shm
               name: dshm
+            - mountPath: /opt/h3
+              name: h3-scripts
 
       volumes:
         - name: zmw-vol-haosu
@@ -93,3 +96,7 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 8Gi
+
+        - name: h3-scripts
+          configMap:
+            name: h3-scripts

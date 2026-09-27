@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: zimo-h3-setup
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: zimo-h3-setup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        # CPU only: downloads the base model and PDMD checkpoints and fuses the 2-NFE LoRA
+        - name: setup
+          image: python:3.11
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              memory: 32Gi
+              cpu: 8000m
+              ephemeral-storage: "20Gi"
+            requests:
+              memory: 32Gi
+              cpu: 8000m
+              ephemeral-storage: "20Gi"
+          env:
+            - name: HF_XET_HIGH_PERFORMANCE
+              value: "1"
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+              pip install -q safetensors==0.8.0 huggingface_hub==1.33.0
+              bash /opt/h3/setup_pv.sh
+          volumeMounts:
+            - mountPath: /pv
+              name: zmw-vol-haosu
+            - mountPath: /opt/h3
+              name: h3-scripts
+      volumes:
+        - name: zmw-vol-haosu
+          persistentVolumeClaim:
+            claimName: zmw-vol-haosu
+        - name: h3-scripts
+          configMap:
+            name: h3-scripts

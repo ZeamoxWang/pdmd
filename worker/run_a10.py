@@ -3,7 +3,8 @@
 Follows the 24-32GB recipe from the Diffusers docs: the transformer and the Qwen3-VL text
 encoder are loaded as int8 (torchao weight-only), the transformer is streamed from CPU to
 GPU block by block, and the text encoder uses leaf-level offload. --transformer-path points
-at a full transformer checkpoint (e.g. one with a LoRA already fused by fuse_lora.py).
+at a full transformer checkpoint (e.g. pdmd_4NFE_full, or the 2-NFE LoRA fused into the base
+transformer by fuse_lora_fp32.py). Sampling uses time shift 12 for video and 3 for audio.
 
 The model is loaded once (~30 min); the worker then polls --queue-dir. A jobs JSON dropped
 there is executed and moved to done/, or to failed/ on error (e.g. OOM), and the worker
@@ -30,6 +31,9 @@ from inference_minimax_h3 import FPS, build_jobs, save_result_video  # noqa: E40
 from resolution_util import resolve_output_size  # noqa: E402
 
 MODEL_ID = "MiniMaxAI/MiniMax-H3"
+# Time shifts used for the PDMD results (the same values as the released scheduler configs)
+VIDEO_SHIFT = 12.0
+AUDIO_SHIFT = 3.0
 
 
 # torchao int8 tensors only accept dtype/layout/device in .to(); with use_stream, group
@@ -53,8 +57,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--queue-dir", type=Path, default=Path("/pv/h3/queue"))
 parser.add_argument("--transformer-path", type=Path, required=True)
 parser.add_argument("--inference-steps", type=int, default=4)
-parser.add_argument("--video-shift", type=float, default=12.0)
-parser.add_argument("--audio-shift", type=float, default=3.0)
 parser.add_argument("--seed", type=int, default=42)
 parser.add_argument("--output-dir", type=Path, default=Path("/pv/h3/outputs"))
 args = parser.parse_args()
@@ -123,9 +125,9 @@ def _decode_on_gpu(*decode_args, **decode_kwargs):
 
 pipe.vae.decode = _decode_on_gpu
 pipe.audio_vae.to("cuda")
-pipe.scheduler.set_shift(args.video_shift)
-pipe.audio_scheduler.set_shift(args.audio_shift)
-log(f"offload ready, shifts video={args.video_shift} audio={args.audio_shift}")
+pipe.scheduler.set_shift(VIDEO_SHIFT)
+pipe.audio_scheduler.set_shift(AUDIO_SHIFT)
+log(f"offload ready, shifts video={pipe.scheduler.shift:g} audio={pipe.audio_scheduler.shift:g}")
 
 args.output_dir.mkdir(parents=True, exist_ok=True)
 for sub in ("done", "failed"):
@@ -133,20 +135,14 @@ for sub in ("done", "failed"):
 
 
 def run_jobs_file(jobs_json):
-    # Each example may override the startup shifts (video_shift / audio_shift) and the
-    # step count (inference_steps)
+    # Each example may override the startup step count with inference_steps
     examples = json.loads(jobs_json.read_text())["examples"]
     for index, job in enumerate(build_jobs(jobs_json)):
         width, height = resolve_output_size(job.megapixels, job.aspect_ratio)
         seed = args.seed + index
-        video_shift = float(examples[index].get("video_shift", args.video_shift))
-        audio_shift = float(examples[index].get("audio_shift", args.audio_shift))
         steps = int(examples[index].get("inference_steps", args.inference_steps))
-        pipe.scheduler.set_shift(video_shift)
-        pipe.audio_scheduler.set_shift(audio_shift)
         log(f"{jobs_json.name} job {index}: {width}x{height}, {job.num_frames} frames, "
-            f"{steps} NFE, shifts video={video_shift:g} audio={audio_shift:g}, "
-            f"seed {seed}")
+            f"{steps} NFE, seed {seed}")
         torch.cuda.reset_peak_memory_stats()
         with torch.inference_mode():
             result = pipe(
@@ -161,8 +157,7 @@ def run_jobs_file(jobs_json):
                 output=["videos", "audio", "sampling_rate"],
             )
         output_path = args.output_dir / (
-            f"{jobs_json.stem}_{index:02d}_{steps}nfe"
-            f"_vs{video_shift:g}_as{audio_shift:g}_seed{seed}.mp4"
+            f"{jobs_json.stem}_{index:02d}_{steps}nfe_seed{seed}.mp4"
         )
         save_result_video(result, output_path, FPS)
         log(f"saved {output_path}, peak GPU mem "
