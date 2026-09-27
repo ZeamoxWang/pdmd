@@ -106,8 +106,9 @@ apply_group_offloading(
     offload_type="leaf_level",
 )
 pipe.audio_vae.to("cuda")
-if hasattr(pipe.vae, "enable_tiling"):
-    pipe.vae.enable_tiling()
+# 瓦片大于画面 => 每个时间段只解码一整块。默认 256px 瓦片在 960x544 上要切 15 块，
+# 而 leaf offload 每次前向都要重新搬运整套解码器权重，解码会慢十几倍。
+pipe.vae.enable_tiling(tile_sample_min_height=4096, tile_sample_min_width=4096)
 pipe.scheduler.set_shift(args.video_shift)
 pipe.audio_scheduler.set_shift(args.audio_shift)
 log(f"offload ready, shifts video={args.video_shift} audio={args.audio_shift}")
