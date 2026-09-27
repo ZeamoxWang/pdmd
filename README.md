@@ -163,21 +163,6 @@ follows the 24–32GB recipe of the Diffusers docs, with a few additions:
 | `jobs/*.json` | The test jobs |
 | `k8s/`, `tools/`, `worker/setup_pv.sh` | Optional: the Kubernetes setup we used to run the tests |
 
-## Known issues and patches
-
-- **torchao int8 + group offload stream**: with `use_stream` enabled, Diffusers group offloading
-  calls `tensor.to(device, non_blocking=True)`, but torchao int8 tensors only accept
-  `dtype/layout/device` and raise an `AssertionError`. `run_a10.py` patches this at the top by using
-  a synchronous copy for torchao tensors (the speed impact is negligible).
-- **`low_cpu_mem_usage=False`**: the Diffusers docs example passes this argument, but the pinned
-  Diffusers version rejects it when loading with quantization, so it is omitted.
-- **Do not decode a whole frame as one VAE tile.** The decoder is a ViT whose RoPE normalizes token
-  positions to [-1, 1] over the tile, and it is used with 256px tiles (16×16 latent tokens).
-  Enlarging the tile to cover a 1344×768 frame makes the position density far denser and the output
-  shows a grid of misaligned 16px blocks. Keep the default tiling.
-- Text encoding prints many "not executed" warnings for `visual.*` layers: a text-only prompt does
-  not go through Qwen3-VL's vision encoder, so these can be ignored.
-
 ## Efficiency on 80GB cards
 
 This code **runs fine** on an 80GB card (nothing in it depends on VRAM size), but it is noticeably
