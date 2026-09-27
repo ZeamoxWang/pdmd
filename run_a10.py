@@ -101,15 +101,23 @@ pipe.transformer.enable_group_offload(
     offload_type="block_level", num_blocks_per_group=1, **offload
 )
 apply_group_offloading(pipe.text_encoder.model, offload_type="leaf_level", **offload)
-# VAE 不常驻 GPU：去噪时 A10 的显存要全部留给 transformer 的激活值
-apply_group_offloading(
-    pipe.vae, onload_device=torch.device("cuda"), offload_device=torch.device("cpu"),
-    offload_type="leaf_level",
-)
+# 视频 VAE 去噪时留在 CPU（A10 显存要全部留给 transformer 的激活值），解码时整体搬上 GPU。
+# 分块保持官方默认的 256px：解码器的 RoPE 把位置归一化到 [-1, 1]，整帧不分块会让位置密度
+# 超出分布，画面出现 16px 的方格伪影。
+_vae_decode = pipe.vae.decode
+
+
+def _decode_on_gpu(*decode_args, **decode_kwargs):
+    pipe.vae.to("cuda")
+    try:
+        return _vae_decode(*decode_args, **decode_kwargs)
+    finally:
+        pipe.vae.to("cpu")
+        torch.cuda.empty_cache()
+
+
+pipe.vae.decode = _decode_on_gpu
 pipe.audio_vae.to("cuda")
-# 瓦片大于画面 => 每个时间段只解码一整块。默认 256px 瓦片在 960x544 上要切 15 块，
-# 而 leaf offload 每次前向都要重新搬运整套解码器权重，解码会慢十几倍。
-pipe.vae.enable_tiling(tile_sample_min_height=4096, tile_sample_min_width=4096)
 pipe.scheduler.set_shift(args.video_shift)
 pipe.audio_scheduler.set_shift(args.audio_shift)
 log(f"offload ready, shifts video={args.video_shift} audio={args.audio_shift}")
