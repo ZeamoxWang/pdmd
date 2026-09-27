@@ -6,6 +6,9 @@ metadata:
     app: zimo-deployment-h3-a10
 spec:
   replicas: 1
+  # A rolling update would need a second A10 while the old pod still holds one; free it first.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: zimo-deployment-h3-a10
@@ -39,15 +42,15 @@ spec:
           # The int8 H3 weights stay in host RAM; loading mmaps the bf16 weights, so the peak is far above the ~62GB int8 footprint
           resources:
             limits:
-              memory: 160Gi
-              cpu: 16000m
+              memory: 128Gi
+              cpu: 8000m
               nvidia.com/gpu: 1
-              ephemeral-storage: "50Gi"
+              ephemeral-storage: "30Gi"
             requests:
-              memory: 160Gi
-              cpu: 16000m
+              memory: 128Gi
+              cpu: 8000m
               nvidia.com/gpu: 1
-              ephemeral-storage: "50Gi"
+              ephemeral-storage: "30Gi"
           env:
             - name: HF_HOME
               value: /pv/h3/hf_cache
