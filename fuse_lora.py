@@ -1,6 +1,7 @@
-"""把 Turbo LoRA 融合进 bf16 transformer 并存盘（只需跑一次，CPU 上完成）。
+"""Fuse the Turbo LoRA into the bf16 transformer and save it (run once, on CPU).
 
-int8 权重无法直接 fuse LoRA，所以先在 bf16 上融合，推理时再量化成 int8。
+A LoRA cannot be fused into int8 weights, so it is fused in bf16 first and the result is
+quantized to int8 at inference time.
 """
 import argparse
 import sys

@@ -1,11 +1,13 @@
-"""单张 A10 (24GB) 上的 MiniMax-H3 Turbo 推理。
+"""MiniMax-H3 inference on a single 24GB GPU (A10).
 
-按 Diffusers 文档里 24-32GB 卡的方案：transformer 和 Qwen3-VL 文本编码器以 int8
-(torchao weight-only) 加载，transformer 按 block 从 CPU 流式搬运到 GPU，文本编码器
-leaf 级 offload。transformer 使用 fuse_lora.py 预先融合好 Turbo LoRA 的权重。
+Follows the 24-32GB recipe from the Diffusers docs: the transformer and the Qwen3-VL text
+encoder are loaded as int8 (torchao weight-only), the transformer is streamed from CPU to
+GPU block by block, and the text encoder uses leaf-level offload. --transformer-path points
+at a full transformer checkpoint (e.g. one with a LoRA already fused by fuse_lora.py).
 
-模型只加载一次（约 30 分钟），之后常驻并轮询 --queue-dir：把 jobs JSON 放进去就会
-被执行，完成后移到 done/，失败（例如 OOM）移到 failed/，进程继续等待下一个任务。
+The model is loaded once (~30 min); the worker then polls --queue-dir. A jobs JSON dropped
+there is executed and moved to done/, or to failed/ on error (e.g. OOM), and the worker
+keeps waiting for the next job.
 """
 import argparse
 import json
@@ -30,8 +32,9 @@ from resolution_util import resolve_output_size  # noqa: E402
 MODEL_ID = "MiniMaxAI/MiniMax-H3"
 
 
-# torchao 的 int8 tensor 的 .to() 只接受 dtype/layout/device，group offload 开了 stream 后
-# 会传 non_blocking=True 触发 AssertionError。torchao tensor 改为同步拷贝，其余不变。
+# torchao int8 tensors only accept dtype/layout/device in .to(); with use_stream, group
+# offloading passes non_blocking=True and trips an AssertionError. Copy torchao tensors
+# synchronously and leave everything else unchanged.
 _original_transfer = _group_offloading.ModuleGroup._transfer_tensor_to_device
 
 
@@ -101,9 +104,11 @@ pipe.transformer.enable_group_offload(
     offload_type="block_level", num_blocks_per_group=1, **offload
 )
 apply_group_offloading(pipe.text_encoder.model, offload_type="leaf_level", **offload)
-# 视频 VAE 去噪时留在 CPU（A10 显存要全部留给 transformer 的激活值），解码时整体搬上 GPU。
-# 分块保持官方默认的 256px：解码器的 RoPE 把位置归一化到 [-1, 1]，整帧不分块会让位置密度
-# 超出分布，画面出现 16px 的方格伪影。
+# The video VAE stays on CPU during denoising (the A10 needs all its memory for the
+# transformer activations) and moves to the GPU as a whole only for the decode call.
+# Keep the default 256px tiling: the decoder's RoPE normalizes positions to [-1, 1], so
+# decoding a whole frame as one tile pushes the position density out of distribution
+# and produces 16px block artifacts.
 _vae_decode = pipe.vae.decode
 
 
@@ -128,7 +133,7 @@ for sub in ("done", "failed"):
 
 
 def run_jobs_file(jobs_json):
-    # 每个 example 可以用 video_shift / audio_shift 覆盖启动参数里的 shift
+    # Each example may override the startup shifts with video_shift / audio_shift
     examples = json.loads(jobs_json.read_text())["examples"]
     for index, job in enumerate(build_jobs(jobs_json)):
         width, height = resolve_output_size(job.megapixels, job.aspect_ratio)
@@ -147,7 +152,7 @@ def run_jobs_file(jobs_json):
                 height=height,
                 width=width,
                 num_frames=job.num_frames,
-                # 调度器的 num_inference_steps 包含终点 sigma=0，N 次 NFE 需要传 N+1
+                # The scheduler counts the terminal sigma=0 as a grid point, so N NFEs need N + 1
                 num_inference_steps=args.inference_steps + 1,
                 generator=torch.Generator().manual_seed(seed),
                 output_type="np",
