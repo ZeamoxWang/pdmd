@@ -7,13 +7,13 @@ states the fusion rule `W_base += lora_scale * (lora_B @ lora_A)` together with
 shard at a time, and every LoRA pair must be consumed exactly once.
 """
 import argparse
-import glob
 import json
 import shutil
 import time
 from pathlib import Path
 
 import torch
+from huggingface_hub import snapshot_download
 from safetensors import safe_open
 from safetensors.torch import save_file
 
@@ -24,7 +24,8 @@ parser.add_argument(
     "--base",
     type=Path,
     default=None,
-    help="Base transformer directory (default: MiniMaxAI/MiniMax-H3 transformer/ in the HF cache).",
+    help="Base transformer directory (default: MiniMaxAI/MiniMax-H3 transformer/, fetched "
+    "into or read from the Hugging Face cache).",
 )
 parser.add_argument(
     "--lora-scale",
@@ -36,8 +37,8 @@ args = parser.parse_args()
 
 t0 = time.time()
 base = args.base or Path(
-    glob.glob("/pv/h3/hf_cache/hub/models--MiniMaxAI--MiniMax-H3/snapshots/*/transformer")[0]
-)
+    snapshot_download("MiniMaxAI/MiniMax-H3", allow_patterns=["transformer/*"])
+) / "transformer"
 
 with safe_open(args.lora, "pt") as f:
     meta = f.metadata() or {}

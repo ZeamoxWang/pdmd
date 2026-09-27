@@ -68,6 +68,51 @@ It covers `to_q`, `to_k`, `to_v`, `to_out.0`, `ff.net.0.proj` and `ff.net.2` in 
 transformer blocks and both token-refiner blocks (312 pairs). `worker/fuse_lora_fp32.py` applies
 this rule in fp32 and casts back to bf16, and fails if any pair is left unused.
 
+## Inference command
+
+`worker/run_a10.py` loads the base model with the given PDMD transformer and generates the videos
+described by a jobs JSON. It needs a checkout of
+[ModelTC/Minimax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo) for job parsing and
+audio/video muxing. On any Linux machine with a 24GB GPU and 128GB of RAM:
+
+```bash
+# Environment (the versions verified on the A10)
+pip install torch==2.14.0 torchvision==0.29.0 torchaudio==2.11.0
+pip install "git+https://github.com/huggingface/diffusers.git@e0abab83b5df05de9e7abd788643c1a7c1e42e28" \
+  transformers==5.17.0 accelerate==1.15.0 peft==0.21.0 torchao==0.18.0 \
+  safetensors==0.8.0 av==18.1.0 huggingface_hub==1.33.0 pillow numpy
+git clone https://github.com/ModelTC/Minimax-H3-Turbo.git
+git -C Minimax-H3-Turbo checkout 02e26d591f7a04d5d1a074c9566d5dd4f22f6225
+
+# Base model (text encoder, VAEs, schedulers, base transformer) and PDMD checkpoints
+hf download MiniMaxAI/MiniMax-H3 --exclude "transformer_ref/*" "FL2VA/*" "Ref2VA/*"
+hf download pdmd2026/pdmd_4NFE_full --local-dir ckpt/pdmd_4NFE_full
+hf download pdmd2026/pdmd_2NFE_lora --local-dir ckpt/pdmd_2NFE_lora
+
+# 4 NFE
+python worker/run_a10.py \
+  --transformer-path ckpt/pdmd_4NFE_full --inference-steps 4 \
+  --jobs-json jobs/giant_cat_harbor_768p_4nfe.json \
+  --turbo-repo Minimax-H3-Turbo --output-dir outputs
+
+# 2 NFE: fuse the LoRA into the base transformer once (CPU, ~15 min), then generate
+python worker/fuse_lora_fp32.py \
+  --lora ckpt/pdmd_2NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_2NFE_fused
+python worker/run_a10.py \
+  --transformer-path ckpt/pdmd_2NFE_fused --inference-steps 2 \
+  --jobs-json jobs/giant_cat_harbor_768p_2nfe.json \
+  --turbo-repo Minimax-H3-Turbo --output-dir outputs
+```
+
+The videos are written as `outputs/<job name>_<index>_<N>nfe_seed<seed>.mp4`. Each command loads
+the model (~25–30 min) before generating; to avoid paying that per video, omit `--jobs-json` and
+the script keeps running as a worker that polls `--queue-dir` for job files. That worker mode is
+what the Kubernetes deployment below runs, with its arguments read from `/pv/h3/serve_args`:
+
+```bash
+python /opt/h3/run_a10.py --transformer-path /pv/h3/ckpt/pdmd_4NFE_full --inference-steps 4
+```
+
 ## Reproduce our test on Nautilus
 
 The steps below run everything on the cluster; all data lives on a PVC mounted at `/pv`, under
@@ -152,7 +197,7 @@ follows the 24–32GB recipe of the Diffusers docs, with a few additions:
 
 | Path | Purpose |
 |---|---|
-| `worker/run_a10.py` | Persistent inference worker: loads the model once, then polls `/pv/h3/queue` |
+| `worker/run_a10.py` | Inference: runs the given `--jobs-json` files once, or keeps running as a worker that polls a queue directory |
 | `worker/fuse_lora_fp32.py` | Fuses the 2-NFE LoRA into the base transformer in fp32 |
 | `worker/setup_pv.sh` | One-off, re-runnable preparation of `/pv/h3` |
 | `k8s/setup_job.yaml` | CPU Job that runs `setup_pv.sh` |

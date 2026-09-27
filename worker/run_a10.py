@@ -6,9 +6,10 @@ GPU block by block, and the text encoder uses leaf-level offload. --transformer-
 at a full transformer checkpoint (e.g. pdmd_4NFE_full, or the 2-NFE LoRA fused into the base
 transformer by fuse_lora_fp32.py). Sampling uses time shift 12 for video and 3 for audio.
 
-The model is loaded once (~30 min); the worker then polls --queue-dir. A jobs JSON dropped
-there is executed and moved to done/, or to failed/ on error (e.g. OOM), and the worker
-keeps waiting for the next job.
+The model is loaded once (~30 min). With --jobs-json the given job files are run and the
+script exits. Otherwise it runs as a worker that polls --queue-dir: a jobs JSON dropped there
+is executed and moved to done/, or to failed/ on error (e.g. OOM), and the worker keeps
+waiting for the next job.
 """
 import argparse
 import json
@@ -25,10 +26,6 @@ from diffusers.hooks import group_offloading as _group_offloading
 from torchao.quantization import Int8WeightOnlyConfig
 from transformers import Qwen3VLForConditionalGeneration
 from transformers import TorchAoConfig as TransformersTorchAoConfig
-
-sys.path.insert(0, "/pv/h3/Minimax-H3-Turbo")
-from inference_minimax_h3 import FPS, build_jobs, save_result_video  # noqa: E402
-from resolution_util import resolve_output_size  # noqa: E402
 
 MODEL_ID = "MiniMaxAI/MiniMax-H3"
 # Time shifts used for the PDMD results (the same values as the released scheduler configs)
@@ -54,12 +51,20 @@ def _transfer_tensor_to_device(self, tensor, source_tensor, default_stream):
 _group_offloading.ModuleGroup._transfer_tensor_to_device = _transfer_tensor_to_device
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--queue-dir", type=Path, default=Path("/pv/h3/queue"))
 parser.add_argument("--transformer-path", type=Path, required=True)
 parser.add_argument("--inference-steps", type=int, default=4)
-parser.add_argument("--seed", type=int, default=42)
+parser.add_argument("--jobs-json", type=Path, nargs="+", default=None,
+                    help="Run these job files once and exit instead of polling --queue-dir.")
+parser.add_argument("--queue-dir", type=Path, default=Path("/pv/h3/queue"))
 parser.add_argument("--output-dir", type=Path, default=Path("/pv/h3/outputs"))
+parser.add_argument("--turbo-repo", type=Path, default=Path("/pv/h3/Minimax-H3-Turbo"),
+                    help="Checkout of ModelTC/Minimax-H3-Turbo (job parsing and muxing helpers).")
+parser.add_argument("--seed", type=int, default=42)
 args = parser.parse_args()
+
+sys.path.insert(0, str(args.turbo_repo))
+from inference_minimax_h3 import FPS, build_jobs, save_result_video  # noqa: E402
+from resolution_util import resolve_output_size  # noqa: E402
 
 t0 = time.time()
 
@@ -130,8 +135,6 @@ pipe.audio_scheduler.set_shift(AUDIO_SHIFT)
 log(f"offload ready, shifts video={pipe.scheduler.shift:g} audio={pipe.audio_scheduler.shift:g}")
 
 args.output_dir.mkdir(parents=True, exist_ok=True)
-for sub in ("done", "failed"):
-    (args.queue_dir / sub).mkdir(parents=True, exist_ok=True)
 
 
 def run_jobs_file(jobs_json):
@@ -164,6 +167,13 @@ def run_jobs_file(jobs_json):
             f"{torch.cuda.max_memory_allocated() / 2**30:.1f} GiB")
 
 
+if args.jobs_json:
+    for jobs_json in args.jobs_json:
+        run_jobs_file(jobs_json)
+    sys.exit(0)
+
+for sub in ("done", "failed"):
+    (args.queue_dir / sub).mkdir(parents=True, exist_ok=True)
 log(f"watching {args.queue_dir}")
 while True:
     pending = sorted(args.queue_dir.glob("*.json"))
