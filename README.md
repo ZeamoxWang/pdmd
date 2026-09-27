@@ -161,7 +161,6 @@ follows the 24–32GB recipe of the Diffusers docs, with a few additions:
 | `worker/run_a10.py` | Inference: runs the given `--jobs-json` files, or keeps running as a worker that polls a queue directory |
 | `worker/fuse_lora_fp32.py` | Fuses the 2-NFE LoRA into the base transformer in fp32 |
 | `jobs/*.json` | The test jobs |
-| `k8s/`, `tools/`, `worker/setup_pv.sh` | Optional: the Kubernetes setup we used to run the tests |
 
 ## Efficiency on 80GB cards
 
