@@ -90,7 +90,7 @@ git clone https://github.com/ModelTC/Minimax-H3-Turbo.git
 git -C Minimax-H3-Turbo checkout 02e26d591f7a04d5d1a074c9566d5dd4f22f6225
 
 # Base model (text encoder, VAEs, schedulers, base transformer), needed by both
-hf download MiniMaxAI/MiniMax-H3 --exclude "transformer_ref/*" "FL2VA/*" "Ref2VA/*"
+hf download MiniMaxAI/MiniMax-H3 --exclude "transformer_ref/*" --exclude "FL2VA/*" --exclude "Ref2VA/*"
 # PDMD checkpoints: download only the one(s) you run
 hf download pdmd2026/pdmd_4NFE_full --local-dir ckpt/pdmd_4NFE_full
 hf download pdmd2026/pdmd_2NFE_lora --local-dir ckpt/pdmd_2NFE_lora
