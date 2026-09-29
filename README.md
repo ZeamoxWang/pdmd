@@ -1,5 +1,7 @@
 # PDMD × MiniMax-H3: inference on a single 24GB GPU
 
+[Paper (arXiv)](https://arxiv.org/abs/2609.35768) · [Project page](https://pdmd2026.github.io/)
+
 Inference for the official **PDMD** (Projected Distribution Matching Distillation) checkpoints of
 [MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) joint video–audio generation, on a
 **single GPU with 24GB of VRAM** (tested on an NVIDIA A10).
