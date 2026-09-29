@@ -29,15 +29,18 @@ Inference for the official **PDMD** (Projected Distribution Matching Distillatio
 | Model | NFE | Type | Hugging Face |
 |---|---|---|---|
 | PDMD full transformer | 4 | full weights (bf16, 7 shards, 66 GB) | [pdmd2026/pdmd_4NFE_full](https://huggingface.co/pdmd2026/pdmd_4NFE_full) |
+| PDMD LoRA | 4 | LoRA rank 128 (fp32, 2.8 GB) | [pdmd2026/pdmd_4NFE_lora](https://huggingface.co/pdmd2026/pdmd_4NFE_lora) |
 | PDMD LoRA | 2 | LoRA rank 128 (fp32, 2.8 GB) | [pdmd2026/pdmd_2NFE_lora](https://huggingface.co/pdmd2026/pdmd_2NFE_lora) |
 
-Both are trained on the base `transformer/` of MiniMax-H3 (the FL2VA/T2VA partition).
+All three are for the base `transformer/` of MiniMax-H3 (the FL2VA/T2VA partition). The 4-NFE
+model is available both as full weights and as a LoRA.
 
 ### Download
 
 ```bash
 pip install -U huggingface_hub
 hf download pdmd2026/pdmd_4NFE_full --local-dir ckpt/pdmd_4NFE_full
+hf download pdmd2026/pdmd_4NFE_lora --local-dir ckpt/pdmd_4NFE_lora
 hf download pdmd2026/pdmd_2NFE_lora --local-dir ckpt/pdmd_2NFE_lora
 ```
 
@@ -54,19 +57,20 @@ transformer = MiniMaxH3Transformer3DModel.from_pretrained(
     torch_dtype=torch.bfloat16,
 )
 
-# 2-NFE: a LoRA to fuse into the base transformer
-lora_path = hf_hub_download("pdmd2026/pdmd_2NFE_lora", "lora_model_0.safetensors")
+# 4-NFE and 2-NFE LoRAs, to fuse into the base transformer
+lora_4nfe = hf_hub_download("pdmd2026/pdmd_4NFE_lora", "lora_model_0.safetensors")
+lora_2nfe = hf_hub_download("pdmd2026/pdmd_2NFE_lora", "lora_model_0.safetensors")
 ```
 
-The 2-NFE LoRA is **not** in PEFT format. Its keys are `transformer.<module>.lora_A.weight` /
-`.lora_B.weight` (no `.default`), it has rank 128 and alpha 128 (scale 1.0), and its safetensors
-metadata states the fusion rule:
+The LoRAs are **not** in PEFT format. Its keys are `transformer.<module>.lora_A.weight` /
+`.lora_B.weight` (no `.default`), they have rank 128 and alpha 128 (scale 1.0), and their
+safetensors metadata states the fusion rule:
 
 ```
 W_base += lora_scale * (lora_B @ lora_A)
 ```
 
-It covers `to_q`, `to_k`, `to_v`, `to_out.0`, `ff.net.0.proj` and `ff.net.2` in all 50
+Each covers `to_q`, `to_k`, `to_v`, `to_out.0`, `ff.net.0.proj` and `ff.net.2` in all 50
 transformer blocks and both token-refiner blocks (312 pairs). `worker/fuse_lora_fp32.py` applies
 this rule in fp32 and casts back to bf16, and fails if any pair is left unused.
 
@@ -77,10 +81,10 @@ described by a jobs JSON. It needs a checkout of
 [ModelTC/Minimax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo) for job parsing and
 audio/video muxing. On any Linux machine with a 24GB GPU and 128GB of RAM:
 
-The 4-NFE and 2-NFE checkpoints are independent; each only needs the base model. To run only
-2 NFE, skip the `pdmd_4NFE_full` download and the 4-NFE command below. The 2-NFE LoRA is fused
-into the original (non-LoRA) transformer, `transformer/` of `MiniMaxAI/MiniMax-H3` (~62GB), which
-the base model download already includes; `fuse_lora_fp32.py` finds it in the Hugging Face cache.
+The checkpoints are independent; each only needs the base model, so download only the one you
+run. A LoRA is fused into the original (non-LoRA) transformer, `transformer/` of
+`MiniMaxAI/MiniMax-H3` (~62GB), which the base model download already includes;
+`fuse_lora_fp32.py` finds it in the Hugging Face cache.
 
 ```bash
 # Environment (the versions verified on the A10)
@@ -95,11 +99,20 @@ git -C Minimax-H3-Turbo checkout 02e26d591f7a04d5d1a074c9566d5dd4f22f6225
 hf download MiniMaxAI/MiniMax-H3 --exclude "transformer_ref/*" --exclude "FL2VA/*" --exclude "Ref2VA/*"
 # PDMD checkpoints: download only the one(s) you run
 hf download pdmd2026/pdmd_4NFE_full --local-dir ckpt/pdmd_4NFE_full
+hf download pdmd2026/pdmd_4NFE_lora --local-dir ckpt/pdmd_4NFE_lora
 hf download pdmd2026/pdmd_2NFE_lora --local-dir ckpt/pdmd_2NFE_lora
 
-# 4 NFE
+# 4 NFE, full weights
 python worker/run_a10.py \
   --transformer-path ckpt/pdmd_4NFE_full --inference-steps 4 \
+  --jobs-json jobs/giant_cat_harbor_768p_4nfe.json \
+  --turbo-repo Minimax-H3-Turbo --output-dir outputs
+
+# 4 NFE, LoRA: fuse the LoRA into the base transformer once (CPU, ~15 min), then generate
+python worker/fuse_lora_fp32.py \
+  --lora ckpt/pdmd_4NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_4NFE_fused
+python worker/run_a10.py \
+  --transformer-path ckpt/pdmd_4NFE_fused --inference-steps 4 \
   --jobs-json jobs/giant_cat_harbor_768p_4nfe.json \
   --turbo-repo Minimax-H3-Turbo --output-dir outputs
 
@@ -126,7 +139,7 @@ over a harbor promenade, with soundscape and music descriptions.
 |---|---|
 | Resolution | 1344×768 (`megapixels: 0.98`, `aspect_ratio: "16:9"`) |
 | Length | 345 frames at 24 fps (~14.4 s), with stereo audio |
-| NFE | 4 (`pdmd_4NFE_full`) or 2 (`pdmd_2NFE_lora` fused) |
+| NFE | 4 (`pdmd_4NFE_full`, or `pdmd_4NFE_lora` fused) or 2 (`pdmd_2NFE_lora` fused) |
 | Time shift | 12 for video, 3 for audio (fixed in `worker/run_a10.py`) |
 | Seed | 42 |
 | Guidance | none (H3 is guidance-distilled) |
@@ -161,7 +174,7 @@ follows the 24–32GB recipe of the Diffusers docs, with a few additions:
 | Path | Purpose |
 |---|---|
 | `worker/run_a10.py` | Inference: runs the given `--jobs-json` files, or keeps running as a worker that polls a queue directory |
-| `worker/fuse_lora_fp32.py` | Fuses the 2-NFE LoRA into the base transformer in fp32 |
+| `worker/fuse_lora_fp32.py` | Fuses a PDMD LoRA (4- or 2-NFE) into the base transformer in fp32 |
 | `jobs/*.json` | The test jobs |
 
 ## Efficiency on 80GB cards
