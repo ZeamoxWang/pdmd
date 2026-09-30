@@ -29,7 +29,7 @@ Inference for the official **PDMD** (Projected Distribution Matching Distillatio
 | Model | NFE | Type | Hugging Face |
 |---|---|---|---|
 | PDMD full transformer | 4 | full weights (bf16, 7 shards, 66 GB) | [pdmd2026/pdmd_4NFE_full](https://huggingface.co/pdmd2026/pdmd_4NFE_full) |
-| PDMD LoRA | 4 | LoRA rank 128 (fp32, 2.8 GB) | [pdmd2026/pdmd_4NFE_lora](https://huggingface.co/pdmd2026/pdmd_4NFE_lora) |
+| PDMD LoRA | 4 | LoRA rank 128 (bf16, 1.4 GB) | [pdmd2026/pdmd_4NFE_lora](https://huggingface.co/pdmd2026/pdmd_4NFE_lora) |
 | PDMD LoRA | 2 | LoRA rank 128 (fp32, 2.8 GB) | [pdmd2026/pdmd_2NFE_lora](https://huggingface.co/pdmd2026/pdmd_2NFE_lora) |
 
 All three are for the base `transformer/` of MiniMax-H3 (the FL2VA/T2VA partition). The 4-NFE
