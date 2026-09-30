@@ -27,7 +27,7 @@ This repository contains:
 
 * 🪐 PDMD checkpoints of [MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) at 4 NFE (full weights and LoRA) and 2 NFE (LoRA)
 * ⚡️ An [inference script](worker/run_a10.py) that runs them on a single 24GB GPU
-* 💥 A [tool](worker/fuse_lora_fp32.py) that fuses the PDMD LoRAs into the base transformer
+* 💥 A [tool](worker/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
 
 
 ## Setup
@@ -89,8 +89,8 @@ The LoRAs cover the attention projections and both feed-forward layers of every 
 token-refiner block, and are fused into the base transformer once (on CPU, ~15 min):
 
 ```bash
-python worker/fuse_lora_fp32.py --lora ckpt/pdmd_4NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_4NFE_fused
-python worker/fuse_lora_fp32.py --lora ckpt/pdmd_2NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_2NFE_fused
+python worker/fuse_lora.py --lora ckpt/pdmd_4NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_4NFE_fused
+python worker/fuse_lora.py --lora ckpt/pdmd_2NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_2NFE_fused
 ```
 
 

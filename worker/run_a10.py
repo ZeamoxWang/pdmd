@@ -4,7 +4,7 @@ Follows the 24-32GB recipe from the Diffusers docs: the transformer and the Qwen
 encoder are loaded as int8 (torchao weight-only), the transformer is streamed from CPU to
 GPU block by block, and the text encoder uses leaf-level offload. --transformer-path points
 at a full transformer checkpoint (e.g. pdmd_4NFE_full, or the 2-NFE LoRA fused into the base
-transformer by fuse_lora_fp32.py). Sampling uses time shift 12 for video and 3 for audio.
+transformer by fuse_lora.py). Sampling uses time shift 12 for video and 3 for audio.
 
 The model is loaded once (~30 min). With --jobs-json the given job files are run and the
 script exits. Otherwise it runs as a worker that polls --queue-dir: a jobs JSON dropped there

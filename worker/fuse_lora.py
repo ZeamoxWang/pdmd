@@ -1,10 +1,10 @@
-"""Fuse a plain (non-PEFT) LoRA checkpoint into the base H3 transformer in fp32.
+"""Fuse a plain (non-PEFT) LoRA checkpoint into the base H3 transformer.
 
 For LoRA files like the PDMD students (`lora_model_0.safetensors`), whose keys look like
 `transformer.<module>.lora_A.weight` / `.lora_B.weight` and whose safetensors metadata
 states the fusion rule `W_base += lora_scale * (lora_B @ lora_A)` together with
-`lora_scale`. Each target weight is fused in fp32 and cast back to the base dtype, one
-shard at a time, and every LoRA pair must be consumed exactly once.
+`lora_scale`. Each target weight is fused at full precision and cast back to the base dtype,
+one shard at a time, and every LoRA pair must be consumed exactly once.
 """
 import argparse
 import json
