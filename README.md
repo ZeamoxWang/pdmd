@@ -29,6 +29,11 @@ This repository contains:
 * ⚡️ An [inference script](worker/run_a10.py) that runs them on a single 24GB GPU
 * 💥 A [tool](worker/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
 
+> **Note.** This codebase is optimized for GPUs with little memory, e.g. an NVIDIA A10 (24GB of GPU
+> memory, with 128GB of host RAM), by quantizing the transformer and the text encoder to int8. On
+> GPUs with more memory, we recommend running in 16-bit precision with `--no-int8`, which matches
+> the setting of the experiments in the paper.
+
 
 ## Setup
 
@@ -133,10 +138,10 @@ skip the quantization; this keeps the same offloading and needs more host RAM. O
 | **Per video** (model loaded) | **~31 min** | **~16–19 min** |
 | Peak GPU memory | 21 GiB | 21 GiB |
 
-On an 80GB GPU (A100 80G, H100, etc.) this code still works, with `--no-int8`, but is not
-recommended: loading the full model with `ComponentsManager` automatic offload, as the official
+On an 80GB GPU (A100 80G, H100, etc.), run with `--no-int8`. Loading the whole model with
+`ComponentsManager` automatic offload, as the official
 [`inference_minimax_h3.py`](https://github.com/ModelTC/Minimax-H3-Turbo/blob/main/inference_minimax_h3.py)
-of MiniMax-H3-Turbo does, is considerably faster there.
+of MiniMax-H3-Turbo does, can be faster there still.
 
 
 ## BibTeX
