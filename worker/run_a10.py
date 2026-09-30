@@ -1,4 +1,4 @@
-"""MiniMax-H3 inference on a single 24GB GPU (A10).
+"""PDMD inference on a single 24GB GPU (A10).
 
 Follows the 24-32GB recipe from the Diffusers docs: the transformer and the Qwen3-VL text
 encoder are loaded as int8 (torchao weight-only), the transformer is streamed from CPU to

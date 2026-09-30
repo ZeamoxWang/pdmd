@@ -1,11 +1,11 @@
-## PDMD: Projected Distribution Matching Distillation for Video Diffusion Models<br><sub>Official MiniMax-H3 checkpoints and inference</sub>
+## PDMD: Projected Distribution Matching Distillation for Video Diffusion Models
 
 ### [Paper](https://arxiv.org/abs/2609.35768) | [Project Page](https://pdmd2026.github.io/) | [Hugging Face](https://huggingface.co/pdmd2026)
 
 ![PDMD samples](visuals/teaser.jpg)
 
-This repo contains pre-trained PDMD checkpoints of MiniMax-H3-33B for four- and two-step joint
-video–audio generation, and code to run them on a single 24GB GPU. You can find more videos, with
+This repo contains four- and two-step PDMD checkpoints for joint video–audio generation (distilled
+from MiniMax-H3-33B), and code to run them on a single 24GB GPU. You can find more videos, with
 sound, on our [project page](https://pdmd2026.github.io/).
 
 > [**PDMD: Projected Distribution Matching Distillation for Video Diffusion Models**](https://arxiv.org/abs/2609.35768)<br>
@@ -25,7 +25,7 @@ the best score on all six audio metrics among the compared 4-NFE models.
 
 This repository contains:
 
-* 🪐 PDMD checkpoints of [MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) at 4 NFE (full weights and LoRA) and 2 NFE (LoRA)
+* 🪐 PDMD checkpoints at 4 NFE (full weights and LoRA) and 2 NFE (LoRA)
 * ⚡️ An [inference script](worker/run_a10.py) that runs them on a single 24GB GPU
 * 💥 A [tool](worker/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
 
@@ -115,10 +115,9 @@ Use `--transformer-path ckpt/pdmd_4NFE_fused` for the 4-NFE LoRA, or
 `--transformer-path ckpt/pdmd_2NFE_fused --inference-steps 2 --jobs-json jobs/giant_cat_harbor_768p_2nfe.json`
 for 2 NFE. Videos are written as `outputs/<job>_<index>_<N>nfe_seed<seed>.mp4`.
 
-**Jobs.** A job file lists prompts with their length, resolution and aspect ratio, in the format of
-`examples/prompts_t2va_test.json` in MiniMax-H3-Turbo, plus an optional `inference_steps`. The
-example jobs in [`jobs/`](jobs) generate a 14.4-second, 1344×768 clip of a building-sized cat over a
-harbor, with sound, at seed 42. Sampling uses time shift 12 for video and 3 for audio, and no
+**Jobs.** A job file lists prompts with their length, resolution and aspect ratio, plus an optional
+`inference_steps` (see [`jobs/`](jobs) for examples). The example jobs generate a 14.4-second,
+1344×768 clip of a building-sized cat over a harbor, with sound, at seed 42. Sampling uses time shift 12 for video and 3 for audio, and no
 classifier-free guidance (MiniMax-H3 is guidance-distilled).
 
 **Many videos.** Loading the model takes ~25–30 min. To pay that once, pass several files to
@@ -136,10 +135,8 @@ VAE is moved to the GPU only to decode. On an NVIDIA A10 at 1344×768 and 345 fr
 | **Per video** (model loaded) | **~31 min** | **~16–19 min** |
 | Peak GPU memory | 21 GiB | 21 GiB |
 
-On an 80GB GPU (A100 80G, H100, etc.) this code still works but is not recommended: loading the
-full model with `ComponentsManager` automatic offload, as the official
-[`inference_minimax_h3.py`](https://github.com/ModelTC/Minimax-H3-Turbo/blob/main/inference_minimax_h3.py)
-of MiniMax-H3-Turbo does, is considerably faster there.
+On an 80GB GPU (A100 80G, H100, etc.) this code still works, but loading the model without
+quantization and offloading is faster.
 
 
 ## BibTeX
@@ -159,7 +156,5 @@ of MiniMax-H3-Turbo does, is considerably faster there.
 
 ## Acknowledgments
 
-We build on [MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3), use the helpers of
-[MiniMax-H3-Turbo](https://github.com/ModelTC/Minimax-H3-Turbo) for job parsing and muxing, and
-follow the low-memory recipe of the [Diffusers](https://github.com/huggingface/diffusers) MiniMax-H3
-pipeline.
+We thank the authors of [MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) and
+[Diffusers](https://github.com/huggingface/diffusers).
