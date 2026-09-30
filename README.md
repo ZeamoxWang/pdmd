@@ -30,9 +30,11 @@ This repository contains:
 * 💥 A [tool](worker/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
 
 > **Note.** This codebase is optimized for GPUs with little memory, e.g. an NVIDIA A10 (24GB of GPU
-> memory, with 128GB of host RAM), by quantizing the transformer and the text encoder to int8. On
-> GPUs with more memory, we recommend running in 16-bit precision with `--no-int8`, which matches
-> the setting of the experiments in the paper.
+> memory, with 128GB of host RAM). It quantizes the transformer and the Qwen3-VL text encoder to
+> int8, and offloads their weights to host memory: the transformer is streamed to the GPU one block
+> at a time and the text encoder one layer at a time, and the VAE is moved to the GPU only to decode.
+> On GPUs with more memory, we recommend running in 16-bit precision with `--no-int8`, which matches
+> the setting of the experiments in the paper; it turns off the quantization and keeps the offloading.
 
 
 ## Setup
