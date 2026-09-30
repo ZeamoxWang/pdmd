@@ -2,7 +2,8 @@
 
 Follows the 24-32GB recipe from the Diffusers docs: the transformer and the Qwen3-VL text
 encoder are loaded as int8 (torchao weight-only), the transformer is streamed from CPU to
-GPU block by block, and the text encoder uses leaf-level offload. --transformer-path points
+GPU block by block, and the text encoder uses leaf-level offload. With --no-int8 both stay
+in bf16 (for GPUs with more memory), with the same offloading. --transformer-path points
 at a full transformer checkpoint (e.g. pdmd_4NFE_full, or the 2-NFE LoRA fused into the base
 transformer by fuse_lora.py). Sampling uses time shift 12 for video and 3 for audio.
 
@@ -13,19 +14,24 @@ waiting for the next job.
 """
 import argparse
 import json
+import os
 import shutil
 import sys
 import time
 import traceback
 from pathlib import Path
 
-import torch
-from diffusers import MiniMaxH3Transformer3DModel, ModularPipeline, TorchAoConfig
-from diffusers.hooks import apply_group_offloading
-from diffusers.hooks import group_offloading as _group_offloading
-from torchao.quantization import Int8WeightOnlyConfig
-from transformers import Qwen3VLForConditionalGeneration
-from transformers import TorchAoConfig as TransformersTorchAoConfig
+# 1344x768 runs close to 24GB; expandable segments avoid fragmentation OOMs. Must be set
+# before torch initializes CUDA.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
+import torch  # noqa: E402
+from diffusers import MiniMaxH3Transformer3DModel, ModularPipeline, TorchAoConfig  # noqa: E402
+from diffusers.hooks import apply_group_offloading  # noqa: E402
+from diffusers.hooks import group_offloading as _group_offloading  # noqa: E402
+from torchao.quantization import Int8WeightOnlyConfig  # noqa: E402
+from transformers import Qwen3VLForConditionalGeneration  # noqa: E402
+from transformers import TorchAoConfig as TransformersTorchAoConfig  # noqa: E402
 
 MODEL_ID = "MiniMaxAI/MiniMax-H3"
 # Time shifts used for the PDMD results (the same values as the released scheduler configs)
@@ -60,6 +66,9 @@ parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
 parser.add_argument("--turbo-repo", type=Path, default=Path("Minimax-H3-Turbo"),
                     help="Checkout of ModelTC/Minimax-H3-Turbo (job parsing and muxing helpers).")
 parser.add_argument("--seed", type=int, default=42)
+parser.add_argument("--no-int8", action="store_true",
+                    help="Keep the transformer and text encoder in bf16 instead of int8. For GPUs "
+                         "with more than 24GB; needs about twice the host RAM.")
 args = parser.parse_args()
 
 sys.path.insert(0, str(args.turbo_repo))
@@ -73,34 +82,59 @@ def log(msg):
     print(f"[{time.time() - t0:7.0f}s] {msg}", flush=True)
 
 
+def load_jobs(jobs_json):
+    """Parse and check a jobs file; returns (job, inference steps) pairs."""
+    # build_jobs accepts either {"examples": [...]} or a bare list and returns one job per
+    # example; each example may override the step count with inference_steps
+    document = json.loads(jobs_json.read_text())
+    examples = document["examples"] if isinstance(document, dict) else document
+    jobs = build_jobs(jobs_json)
+    unsupported = [f"{i}: {job.task}" for i, job in enumerate(jobs) if job.task != "t2va"]
+    if unsupported:
+        # Only prompts are passed to the pipeline, so image or reference conditioning would be
+        # silently dropped
+        raise ValueError(f"{jobs_json.name}: only t2va jobs are supported, got {unsupported}")
+    steps = [int(example.get("inference_steps", args.inference_steps)) for example in examples]
+    if min(steps) < 1:
+        raise ValueError(f"{jobs_json.name}: inference steps must be at least 1, got {steps}")
+    return list(zip(jobs, steps))
+
+
+# Check every job file before spending ~30 min on loading the model
+if args.jobs_json:
+    for jobs_json in args.jobs_json:
+        load_jobs(jobs_json)
+
+
+if args.no_int8:
+    transformer_quant, text_encoder_quant = {}, {}
+else:
+    transformer_quant = {"quantization_config": TorchAoConfig(
+        Int8WeightOnlyConfig(version=2),
+        modules_to_not_convert=[
+            "proj_in", "audio_proj_in", "context_embedder", "time_embedder", "time_proj",
+            "token_refiner", "norm_out", "proj_out", "audio_proj_out",
+        ],
+    )}
+    text_encoder_quant = {"quantization_config": TransformersTorchAoConfig(
+        Int8WeightOnlyConfig(version=2),
+        modules_to_not_convert=[
+            "model.visual", "model.language_model.embed_tokens",
+            "model.language_model.norm", "lm_head",
+        ],
+    )}
+
 pipe = ModularPipeline.from_pretrained(MODEL_ID)
 pipe.update_components(
     transformer=MiniMaxH3Transformer3DModel.from_pretrained(
-        args.transformer_path,
-        dtype=torch.bfloat16,
-        quantization_config=TorchAoConfig(
-            Int8WeightOnlyConfig(version=2),
-            modules_to_not_convert=[
-                "proj_in", "audio_proj_in", "context_embedder", "time_embedder", "time_proj",
-                "token_refiner", "norm_out", "proj_out", "audio_proj_out",
-            ],
-        ),
+        args.transformer_path, dtype=torch.bfloat16, **transformer_quant
     ),
     text_encoder=Qwen3VLForConditionalGeneration.from_pretrained(
-        MODEL_ID,
-        subfolder="text_encoder",
-        dtype=torch.bfloat16,
-        quantization_config=TransformersTorchAoConfig(
-            Int8WeightOnlyConfig(version=2),
-            modules_to_not_convert=[
-                "model.visual", "model.language_model.embed_tokens",
-                "model.language_model.norm", "lm_head",
-            ],
-        ),
+        MODEL_ID, subfolder="text_encoder", dtype=torch.bfloat16, **text_encoder_quant
     ),
 )
 pipe.load_components(workflow="t2va", dtype=torch.bfloat16)
-log("components loaded (int8)")
+log(f"components loaded ({'bf16' if args.no_int8 else 'int8'})")
 
 pipe.transformer.requires_grad_(False)
 pipe.text_encoder.requires_grad_(False)
@@ -138,12 +172,9 @@ args.output_dir.mkdir(parents=True, exist_ok=True)
 
 
 def run_jobs_file(jobs_json):
-    # Each example may override the startup step count with inference_steps
-    examples = json.loads(jobs_json.read_text())["examples"]
-    for index, job in enumerate(build_jobs(jobs_json)):
+    for index, (job, steps) in enumerate(load_jobs(jobs_json)):
         width, height = resolve_output_size(job.megapixels, job.aspect_ratio)
         seed = args.seed + index
-        steps = int(examples[index].get("inference_steps", args.inference_steps))
         log(f"{jobs_json.name} job {index}: {width}x{height}, {job.num_frames} frames, "
             f"{steps} NFE, seed {seed}")
         torch.cuda.reset_peak_memory_stats()
@@ -176,7 +207,8 @@ for sub in ("done", "failed"):
     (args.queue_dir / sub).mkdir(parents=True, exist_ok=True)
 log(f"watching {args.queue_dir}")
 while True:
-    pending = sorted(args.queue_dir.glob("*.json"))
+    # Skip files modified in the last few seconds, which may still be being written
+    pending = sorted(p for p in args.queue_dir.glob("*.json") if time.time() - p.stat().st_mtime > 5)
     if not pending:
         time.sleep(10)
         continue

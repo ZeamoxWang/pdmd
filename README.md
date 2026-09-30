@@ -120,9 +120,11 @@ classifier-free guidance (MiniMax-H3 is guidance-distilled).
 `--jobs-json`, or omit it and the script keeps running as a worker that picks up job files dropped
 into `--queue-dir`.
 
-**Hardware.** This code is built for GPUs with 24GB of memory and needs **128GB of host RAM**: the
-transformer and the Qwen3-VL text encoder are quantized to int8 and streamed from CPU to GPU, and the
-VAE is moved to the GPU only to decode. On an NVIDIA A10 at 1344×768 and 345 frames:
+**Hardware.** This code is built for GPUs with 24GB of memory and needs **128GB of host RAM**: by
+default the transformer and the Qwen3-VL text encoder are quantized to int8 and streamed from CPU to
+GPU, and the VAE is moved to the GPU only to decode. On a GPU with more memory, add `--no-int8` to
+skip the quantization; this keeps the same offloading and needs more host RAM. On an NVIDIA A10 at
+1344×768 and 345 frames (default settings):
 
 | | 4 NFE | 2 NFE |
 |---|---|---|
@@ -131,8 +133,8 @@ VAE is moved to the GPU only to decode. On an NVIDIA A10 at 1344×768 and 345 fr
 | **Per video** (model loaded) | **~31 min** | **~16–19 min** |
 | Peak GPU memory | 21 GiB | 21 GiB |
 
-On an 80GB GPU (A100 80G, H100, etc.) this code still works but is not recommended: loading the
-full model with `ComponentsManager` automatic offload, as the official
+On an 80GB GPU (A100 80G, H100, etc.) this code still works, with `--no-int8`, but is not
+recommended: loading the full model with `ComponentsManager` automatic offload, as the official
 [`inference_minimax_h3.py`](https://github.com/ModelTC/Minimax-H3-Turbo/blob/main/inference_minimax_h3.py)
 of MiniMax-H3-Turbo does, is considerably faster there.
 

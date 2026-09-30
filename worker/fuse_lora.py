@@ -39,6 +39,8 @@ t0 = time.time()
 base = args.base or Path(
     snapshot_download("MiniMaxAI/MiniMax-H3", allow_patterns=["transformer/*"])
 ) / "transformer"
+if args.output.resolve() == base.resolve():
+    raise ValueError("--output must differ from the base transformer directory")
 
 with safe_open(args.lora, "pt") as f:
     meta = f.metadata() or {}
@@ -46,7 +48,12 @@ with safe_open(args.lora, "pt") as f:
 print(f"LoRA metadata: {json.dumps(meta, indent=1)}", flush=True)
 if meta.get("fuse") != "W_base += lora_scale * (lora_B @ lora_A)":
     raise ValueError(f"Unexpected fusion rule in LoRA metadata: {meta.get('fuse')!r}")
-scale = args.lora_scale if args.lora_scale is not None else float(meta["lora_scale"])
+if args.lora_scale is not None:
+    scale = args.lora_scale
+elif "lora_scale" in meta:
+    scale = float(meta["lora_scale"])
+else:
+    raise ValueError("LoRA metadata has no lora_scale; pass --lora-scale")
 prefix = "transformer."
 
 pairs = {}
@@ -58,12 +65,22 @@ for key in lora:
             if module is None:
                 raise ValueError(f"LoRA key without the {prefix!r} prefix: {key}")
             pairs.setdefault(module, {})[part] = lora[key]
+            break
+    else:
+        # Anything other than LoRA pairs would otherwise be dropped silently
+        raise ValueError(f"Unexpected tensor in the LoRA file: {key}")
+if not pairs:
+    raise ValueError(f"No LoRA pairs found in {args.lora}")
 incomplete = [m for m, p in pairs.items() if set(p) != {"lora_A", "lora_B"}]
 if incomplete:
     raise ValueError(f"LoRA modules missing A or B: {incomplete[:5]}")
 print(f"{len(pairs)} LoRA pairs, scale={scale}, base={base}", flush=True)
 
 index = json.load(open(base / "diffusion_pytorch_model.safetensors.index.json"))
+# Check before writing anything that every LoRA pair targets a base weight
+missing = sorted(m for m in pairs if m + ".weight" not in index["weight_map"])
+if missing:
+    raise ValueError(f"{len(missing)} LoRA pairs do not match any base weight: {missing[:5]}")
 args.output.mkdir(parents=True, exist_ok=True)
 used = set()
 stats = []
