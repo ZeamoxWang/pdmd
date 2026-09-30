@@ -5,7 +5,7 @@
 ![PDMD samples](visuals/teaser.jpg)
 
 This repo contains four- and two-step PDMD checkpoints for joint video–audio generation (distilled
-from MiniMax-H3-33B), and code to run them on a single 24GB GPU. You can find more videos, with
+from MiniMax-H3-33B), and code to run them on a single 24GB or 80GB GPU. You can find more videos, with
 sound, on our [project page](https://pdmd2026.github.io/).
 
 > [**PDMD: Projected Distribution Matching Distillation for Video Diffusion Models**](https://arxiv.org/abs/2609.35768)<br>
@@ -26,13 +26,15 @@ the best score on all six audio metrics among the compared 4-NFE models.
 This repository contains:
 
 * 🪐 PDMD checkpoints at 4 NFE (full weights and LoRA) and 2 NFE (LoRA)
-* ⚡️ An [inference script](worker/run_a10.py) that runs them on a single 24GB GPU
+* ⚡️ Inference scripts that run them on a single 24GB GPU ([`run_a10.py`](worker/run_a10.py)) or a single 80GB GPU ([`run_a100.py`](worker/run_a100.py))
 * 💥 A [tool](worker/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
 
-> **Note.** This codebase is optimized for GPUs with little memory, e.g. an NVIDIA A10 (24GB of GPU
-> memory, with 128GB of host RAM). The code quantizes the transformer and the Qwen3-VL text encoder to
-> int8, and offloads their weights to host memory: the transformer is streamed to the GPU one block
-> at a time and the text encoder one layer at a time, and the VAE is moved to the GPU only to decode.
+> **Note.** The main script, `run_a10.py`, is optimized for GPUs with little memory, e.g. an NVIDIA A10
+> (24GB of GPU memory, with 128GB of host RAM). The script quantizes the transformer and the Qwen3-VL
+> text encoder to int8, and offloads their weights to host memory: the transformer is streamed to the
+> GPU one block at a time and the text encoder one layer at a time, and the VAE is moved to the GPU
+> only to decode. On 80GB GPUs, `run_a100.py` runs all components in bf16 instead (see
+> [Sampling](#sampling)).
 
 
 ## Setup
@@ -120,11 +122,11 @@ for 2 NFE. Videos are written as `outputs/<job>_<index>_<N>nfe_seed<seed>.mp4`.
 1344×768 clip of a building-sized cat over a harbor, with sound, at seed 42. Sampling uses time shift 12 for video and 3 for audio, and no
 classifier-free guidance (MiniMax-H3 is guidance-distilled).
 
-**Many videos.** Loading the model takes ~25–30 min. To pay that once, pass several files to
-`--jobs-json`, or omit it and the script keeps running as a worker that picks up job files dropped
-into `--queue-dir`.
+**Many videos.** `run_a10.py` takes ~25–30 min to load the model. To pay that once, pass several
+files to `--jobs-json`, or omit it and the script keeps running as a worker that picks up job files
+dropped into `--queue-dir`.
 
-**Hardware.** This code is built for GPUs with 24GB of memory and needs **128GB of host RAM**: the
+**Hardware.** `run_a10.py` is built for GPUs with 24GB of memory and needs **128GB of host RAM**: the
 transformer and the Qwen3-VL text encoder are quantized to int8 and streamed from CPU to GPU, and the
 VAE is moved to the GPU only to decode. On an NVIDIA A10 at 1344×768 and 345 frames:
 
@@ -135,8 +137,23 @@ VAE is moved to the GPU only to decode. On an NVIDIA A10 at 1344×768 and 345 fr
 | **Per video** (model loaded) | **~31 min** | **~16–19 min** |
 | Peak GPU memory | 21 GiB | 21 GiB |
 
-On an 80GB GPU (A100 80G, H100, etc.) this code still works, but loading the model without
-quantization and offloading is faster.
+**80GB GPUs.** On an 80GB GPU such as an A100 80GB, use [`worker/run_a100.py`](worker/run_a100.py),
+which takes the same arguments:
+
+```bash
+python worker/run_a100.py \
+  --transformer-path ckpt/pdmd_4NFE_full --inference-steps 4 \
+  --jobs-json jobs/giant_cat_harbor_768p_4nfe.json \
+  --turbo-repo Minimax-H3-Turbo --output-dir outputs
+```
+
+`run_a100.py` runs all components in bf16, without quantization, so its videos are not identical to
+those of `run_a10.py`. It moves each component to the GPU as a whole when the component runs, except
+the transformer, which is still streamed one block at a time because its bf16 weights plus the
+activations of a long 768p clip do not fit in 80GB (`--transformer-offload none` keeps the whole
+transformer on the GPU, for shorter or lower-resolution clips). It also needs 128GB of host RAM. On
+an A100 80GB at 1344×768 and 345 frames, a 4-NFE video takes ~10 min (~7.7 min denoising), with a
+peak GPU memory of 62.5 GiB.
 
 
 ## BibTeX
