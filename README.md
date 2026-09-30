@@ -33,9 +33,6 @@ This repository contains:
 > memory, with 128GB of host RAM). The code quantizes the transformer and the Qwen3-VL text encoder to
 > int8, and offloads their weights to host memory: the transformer is streamed to the GPU one block
 > at a time and the text encoder one layer at a time, and the VAE is moved to the GPU only to decode.
-> On GPUs with more memory, we recommend running in 16-bit precision with `--no-int8`, which matches
-> the setting of the experiments in the paper; `--no-int8` turns off the quantization and keeps the
-> offloading.
 
 
 ## Setup
@@ -128,11 +125,9 @@ classifier-free guidance (MiniMax-H3 is guidance-distilled).
 `--jobs-json`, or omit it and the script keeps running as a worker that picks up job files dropped
 into `--queue-dir`.
 
-**Hardware.** This code is built for GPUs with 24GB of memory and needs **128GB of host RAM**: by
-default the transformer and the Qwen3-VL text encoder are quantized to int8 and streamed from CPU to
-GPU, and the VAE is moved to the GPU only to decode. On a GPU with more memory, add `--no-int8` to
-skip the quantization; this keeps the same offloading and needs more host RAM. On an NVIDIA A10 at
-1344×768 and 345 frames (default settings):
+**Hardware.** This code is built for GPUs with 24GB of memory and needs **128GB of host RAM**: the
+transformer and the Qwen3-VL text encoder are quantized to int8 and streamed from CPU to GPU, and the
+VAE is moved to the GPU only to decode. On an NVIDIA A10 at 1344×768 and 345 frames:
 
 | | 4 NFE | 2 NFE |
 |---|---|---|
@@ -141,10 +136,10 @@ skip the quantization; this keeps the same offloading and needs more host RAM. O
 | **Per video** (model loaded) | **~31 min** | **~16–19 min** |
 | Peak GPU memory | 21 GiB | 21 GiB |
 
-On an 80GB GPU (A100 80G, H100, etc.), run with `--no-int8`. Loading the whole model with
-`ComponentsManager` automatic offload, as the official
+On an 80GB GPU (A100 80G, H100, etc.) this code still works but is not recommended: loading the
+full model with `ComponentsManager` automatic offload, as the official
 [`inference_minimax_h3.py`](https://github.com/ModelTC/Minimax-H3-Turbo/blob/main/inference_minimax_h3.py)
-of MiniMax-H3-Turbo does, can be faster there still.
+of MiniMax-H3-Turbo does, is considerably faster there.
 
 
 ## BibTeX

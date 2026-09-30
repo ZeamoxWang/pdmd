@@ -2,8 +2,7 @@
 
 Follows the 24-32GB recipe from the Diffusers docs: the transformer and the Qwen3-VL text
 encoder are loaded as int8 (torchao weight-only), the transformer is streamed from CPU to
-GPU block by block, and the text encoder uses leaf-level offload. With --no-int8 both stay
-in bf16 (for GPUs with more memory), with the same offloading. --transformer-path points
+GPU block by block, and the text encoder uses leaf-level offload. --transformer-path points
 at a full transformer checkpoint (e.g. pdmd_4NFE_full, or the 2-NFE LoRA fused into the base
 transformer by fuse_lora.py). Sampling uses time shift 12 for video and 3 for audio.
 
@@ -66,9 +65,6 @@ parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
 parser.add_argument("--turbo-repo", type=Path, default=Path("Minimax-H3-Turbo"),
                     help="Checkout of ModelTC/Minimax-H3-Turbo (job parsing and muxing helpers).")
 parser.add_argument("--seed", type=int, default=42)
-parser.add_argument("--no-int8", action="store_true",
-                    help="Keep the transformer and text encoder in bf16 instead of int8. For GPUs "
-                         "with more than 24GB; needs about twice the host RAM.")
 args = parser.parse_args()
 
 sys.path.insert(0, str(args.turbo_repo))
@@ -106,35 +102,34 @@ if args.jobs_json:
         load_jobs(jobs_json)
 
 
-if args.no_int8:
-    transformer_quant, text_encoder_quant = {}, {}
-else:
-    transformer_quant = {"quantization_config": TorchAoConfig(
-        Int8WeightOnlyConfig(version=2),
-        modules_to_not_convert=[
-            "proj_in", "audio_proj_in", "context_embedder", "time_embedder", "time_proj",
-            "token_refiner", "norm_out", "proj_out", "audio_proj_out",
-        ],
-    )}
-    text_encoder_quant = {"quantization_config": TransformersTorchAoConfig(
-        Int8WeightOnlyConfig(version=2),
-        modules_to_not_convert=[
-            "model.visual", "model.language_model.embed_tokens",
-            "model.language_model.norm", "lm_head",
-        ],
-    )}
-
 pipe = ModularPipeline.from_pretrained(MODEL_ID)
 pipe.update_components(
     transformer=MiniMaxH3Transformer3DModel.from_pretrained(
-        args.transformer_path, dtype=torch.bfloat16, **transformer_quant
+        args.transformer_path,
+        dtype=torch.bfloat16,
+        quantization_config=TorchAoConfig(
+            Int8WeightOnlyConfig(version=2),
+            modules_to_not_convert=[
+                "proj_in", "audio_proj_in", "context_embedder", "time_embedder", "time_proj",
+                "token_refiner", "norm_out", "proj_out", "audio_proj_out",
+            ],
+        ),
     ),
     text_encoder=Qwen3VLForConditionalGeneration.from_pretrained(
-        MODEL_ID, subfolder="text_encoder", dtype=torch.bfloat16, **text_encoder_quant
+        MODEL_ID,
+        subfolder="text_encoder",
+        dtype=torch.bfloat16,
+        quantization_config=TransformersTorchAoConfig(
+            Int8WeightOnlyConfig(version=2),
+            modules_to_not_convert=[
+                "model.visual", "model.language_model.embed_tokens",
+                "model.language_model.norm", "lm_head",
+            ],
+        ),
     ),
 )
 pipe.load_components(workflow="t2va", dtype=torch.bfloat16)
-log(f"components loaded ({'bf16' if args.no_int8 else 'int8'})")
+log("components loaded (int8)")
 
 pipe.transformer.requires_grad_(False)
 pipe.text_encoder.requires_grad_(False)
