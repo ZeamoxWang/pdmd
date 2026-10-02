@@ -156,6 +156,83 @@ an A100 80GB at 1344×768 and 345 frames, a 4-NFE video takes ~10 min (~7.7 min 
 peak GPU memory of 62.5 GiB.
 
 
+## 2-NFE samples
+
+The 2-NFE LoRA still shows some painterly, oil-painting-like texture, oversaturation and degraded
+audio, but as of the end of September 2026 it is, to our knowledge, the only publicly released 2-NFE
+distilled LoRA for MiniMax-H3. In some scenes its samples are on par with those of the 4-NFE
+checkpoint, though overall a gap to 4 NFE remains. Below are four prompts, each sampled at 2 NFE and
+at 4 NFE (with sound); more videos are on the [project page](https://pdmd2026.github.io/).
+
+### The viaduct
+
+<details>
+<summary>Prompt</summary>
+
+[Shot 1] Live-action, cinematic, a medium-wide view from a mountain station terrace frames a slender elevated viaduct between green summits in bright morning light. The rounded nose of a streamlined ivory train with a teal window band enters from the left and moves smoothly past the camera, white platform columns reflected in its dark windows with a few seated passengers as quiet silhouettes. The camera pans right at slow speed to follow the first carriage, revealing the track extending out over a cloud-filled valley with the departure already underway. [Shot 2] At 00:04.000, the camera cuts to a wide lateral aerial view of the complete six-carriage train crossing the viaduct. The camera tracks at matching speed while regularly spaced white supports pass beneath and the valley clouds stay far below the track; a green summit with a small glass station appears ahead as the train follows a gentle curve, its carriages physically connected and its wheels aligned to the rail. [Shot 3] At 00:09.000, the shot cuts to an elevated view from beyond the destination summit as the train rounds the final curve toward the glass station. The camera pulls out with large amplitude at slow speed to reveal the viaduct connecting several mountain peaks, sunlight on the ivory carriages and station roof, soft blue shadows beneath the bridge, and the original departure terrace faintly visible in the distance, ending with the train still moving and open blue sky above. overall_soundscape: Steel wheels run over rail joints in an even rhythmic pattern beneath a smooth electric traction hum. Air rushes along the carriage sides and changes tone as the train passes the camera, and a high mountain wind crosses the viaduct supports between passes. non_diegetic_music: A repeating piano figure at a moderate tempo with sustained strings and a light rhythmic pulse, broadening in volume through the final wide view.
+
+</details>
+
+**2 NFE**
+
+https://github.com/user-attachments/assets/d1f3a96b-bd9f-4f76-a8d7-fe5f733ff606
+
+**4 NFE**
+
+https://github.com/user-attachments/assets/f793e523-5f6c-40e5-a6e9-00b86e8b952b
+
+### The red footbridge
+
+<details>
+<summary>Prompt</summary>
+
+[Shot 1] 3D CG, cinematic fantasy, a medium-wide view beside a small red footbridge over a clear stream frames a hiker in a cream jacket and blue backpack pausing on the bridge as a broad shadow moves gently across the water. The camera tilts up with medium amplitude at slow speed through a clean gap in enormous trees, revealing part of the pale stone shoulder and head of a mountain-sized titan covered in living moss beyond the canopy. Leaves move lightly in the breeze while the forest stays still enough for the enormous figure to read clearly as it looks toward the open meadow. [Shot 2] At 00:04.000, the camera cuts to a wide side view at the forest edge as the titan takes one slow step out from between two huge trees and places its foot on an open stone terrace without crushing vegetation. Moss on its shoulders shifts subtly and long grass tufts bend in the displaced air while the camera trucks right at slow speed, keeping the entire body visible against blue sky with the red footbridge tiny in the lower background. [Shot 3] At 00:09.000, the shot cuts to a high wide view across the bright alpine meadow as the titan settles into a still relaxed stance beside a mountain ridge, its pale stone body echoing the geology around it. The camera pulls out with large amplitude at slow speed to reveal stream, forest, bridge, and hiker as one coherent valley; the titan raises its head slightly toward the sunlight and then stays calm, the frame ending with the broad figure offset against open sky. overall_soundscape: A clear stream runs under the footbridge while wind moves through enormous leaves overhead. The titan's step lands as a deep low ground impact with grinding stone and a soft shift of moss and loose earth, followed by a broad displacement of air across the grass and returning birdsong. non_diegetic_music: Sustained low strings at a slow tempo with a simple woodwind line, joined by soft choral tones as the titan steps out and settling into a held chord.
+
+</details>
+
+**2 NFE**
+
+https://github.com/user-attachments/assets/84ed6a07-7921-4154-b668-fde7d86df970
+
+**4 NFE**
+
+https://github.com/user-attachments/assets/8ee0f350-c0bf-4f61-b43a-3123fff7e4d3
+
+### Lantern-head
+
+<details>
+<summary>Prompt</summary>
+
+[Shot 1] Live-action, cinematic, a low medium-wide shot frames a steampunk mechanical creature walking forward through ancient fog-filled ruins, its head replaced by a large brass lantern with flames flickering inside the glass. Brass gears turn and pistons flex at the hips and shoulders as it moves with real weight, and the shifting firelight travels across its metal body and the broken stone around it. The camera tracks backward at matching speed ahead of the creature while occasional embers float through the misty air. [Shot 2] At 00:05.000, the camera cuts to a closer side view of the torso and lantern head as the creature stops and scans its surroundings with slow deliberate head motions. Internal flames rise and fall, throwing moving light onto fluted columns and fallen masonry, while exposed pistons vent thin steam and the camera trucks right at slow speed to reveal the depth of the ruined hall behind it. [Shot 3] At 00:10.000, the shot cuts to a wide view down a collapsed colonnade as the creature resumes walking away from the camera, its lantern head the brightest point in the fog. The camera pulls out with medium amplitude at slow speed, revealing the scale of the ruins while background fog rolls slowly in the wind and faint cinders drift past the lens, ending with the figure small between the broken columns. overall_soundscape: Heavy metal feet strike stone with deep echoing impacts, and brass gears click and ratchet continuously through each step. Pistons release short steam hisses, fire inside the lantern crackles and gusts, and a low wind moves through the ruined hall. non_diegetic_music: A low sustained drone at a slow tempo with sparse metallic percussion, joined by a single repeating low string figure that increases slightly in volume as the creature walks away.
+
+</details>
+
+**2 NFE**
+
+https://github.com/user-attachments/assets/7d2a5546-86e5-451c-b638-061a7e49f3c0
+
+**4 NFE**
+
+https://github.com/user-attachments/assets/b3906199-6f02-4232-b995-003da2e01b6f
+
+### The thorned rider
+
+<details>
+<summary>Prompt</summary>
+
+[Shot 1] 3D CG, dark high-fantasy cinematic style in one continuous shot, a hooded horned rider in dark spiked armor with a tattered black cloak and a thorned crown-like halo above his hood sits mounted on a massive black demonic horse with large curved horns, a tar-slicked coat, and chain-laced tack, both standing in near-static frontal pose on wet scorched ground in a misty forest of dead trees under a red-lit sky. A searing corona of red-white flame burns from the rider's back and reflects across the flooded ground. The camera holds a near-static shot with a very slow push in as the rider (S1) raises his outstretched arm further, fingers flexing into a commanding gesture, his hooded head tilting slightly, and says in a low, gravelly, echoing voice: &lt;d&gt;[English] Where in the world is Mordor?&lt;/d&gt; His cloak catches the wind and billows outward, snapping along its ragged edges, while the flame corona intensifies and writhes larger with volatile twisting motion. Behind them the bare dead trees sway and creak, branches shifting against the glowing red haze. The horse shifts its weight and stomps one foreleg into the wet ground, sending up a small splash and a scatter of embers that ripple the reflected firelight beneath them. Fine embers drift past the lens throughout, blurring softly as they pass while rider and horse stay sharp, and the shot ends with the rider still mid-gesture, arm extended, cloak settling, and the corona still restlessly burning. overall_soundscape: Wind drives steadily through dead branches that creak and knock against one another. The flame corona roars and gutters with each surge, embers tick faintly as they pass the lens, and a heavy hoof stamps into shallow standing water with a wet splash followed by chain tack rattling and low equine breathing. non_diegetic_music: A low sustained drone at a slow tempo under sparse percussive strikes, with a single deep brass tone entering beneath the gesture and holding as the flame surges.
+
+</details>
+
+**2 NFE**
+
+https://github.com/user-attachments/assets/146614de-d108-45f5-ad6e-5c72cb5b1561
+
+**4 NFE**
+
+https://github.com/user-attachments/assets/a93db73e-84ae-4708-8e0d-c0991ff192de
+
+
 ## BibTeX
 
 ```bibtex
