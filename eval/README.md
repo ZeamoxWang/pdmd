@@ -151,7 +151,10 @@ audio, removes its mean, and pads/truncates to 10 seconds as in av-benchmark.
 IS uses softmax logits with 10 shuffled splits and seed 2020. IB uses the
 upstream 0.5 fps video sampler and three 2-second audio clips; the cosine is
 reported without multiplying by 100. DeSync averages the absolute predicted
-offsets of the first and last 4.8-second windows. PQ, CE, CU, IB and DeSync are
+offsets of the first and last 4.8-second windows. The AV decoder requests
+only complete Synchformer 16-frame windows at stride 8 (5.12 seconds for
+124/24-second clips), avoiding terminal-frame rounding during 24-to-25 fps
+resampling; the encoder would discard those trailing incomplete strides anyway. PQ, CE, CU, IB and DeSync are
 then averaged equally over videos. These are explicit official-default settings
 for this public runner; the original paper environment has not been compared.
 

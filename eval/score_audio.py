@@ -57,6 +57,7 @@ def main():
             'audiobox': '16 kHz; official 10 s windows and duration-weighted aggregation',
             'passt': '32 kHz; mean removal; crop/pad to 10 s; softmax logits; shuffled splits',
             'imagebind': 'upstream 0.5 fps, 224 px, 3 spatial crops; three 2 s audio clips; unscaled cosine',
+            'sync_effective_duration_seconds': (16 + ((int(args.duration * 25) - 16) // 8) * 8) / 25,
             'desync': 'upstream 25 fps, 224 px; 16 kHz; mean absolute argmax offset of first/last 14 segments',
             'versions': {n: importlib.metadata.version(n) for n in ['torch', 'torchaudio', 'torchvision', 'av_bench', 'audiobox_aesthetics']}})
         return
@@ -107,11 +108,20 @@ def main():
             from imagebind.models.imagebind_model import ModalityType
             sync = Synchformer().cuda().eval()
             sync.load_state_dict(torch.load(args.av_benchmark / 'weights/synchformer_state_dict.pth', map_location='cpu', weights_only=True))
-            ib = imagebind_model.imagebind_huge(pretrained=True).cuda().eval()
+            ib = imagebind_model.imagebind_huge(pretrained=False)
+            ib.load_state_dict(torch.hub.load_state_dict_from_url(
+                'https://dl.fbaipublicfiles.com/imagebind/imagebind_huge.pth',
+                map_location='cpu', weights_only=True))
+            ib = ib.cuda().eval()
             mel = torchaudio.transforms.MelSpectrogram(sample_rate=16000, win_length=400, hop_length=160, n_fft=1024, n_mels=128).cuda()
-            vd = VideoDataset(videos, duration_sec=args.duration)
+            # Synchformer consumes 16-frame windows at stride 8. The encoder
+            # discards trailing incomplete strides anyway. Request only that
+            # used prefix to avoid torio's terminal-frame rounding at 24->25 fps.
+            sync_frames = 16 + ((int(args.duration * 25) - 16) // 8) * 8
+            sync_duration = sync_frames / 25
+            vd = VideoDataset(videos, duration_sec=sync_duration)
             ad = ImageBindAudioDataset(wavs)
-            sd = SynchformerAudioDataset(wavs, duration=args.duration)
+            sd = SynchformerAudioDataset(wavs, duration=sync_duration)
             grid = make_class_grid(-2, 2, 21)
             rows = []
             for i, video in enumerate(videos):
