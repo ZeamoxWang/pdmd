@@ -7,7 +7,7 @@ activations for long, high-resolution clips does not fit in 80GB, so by default 
 to the GPU one block at a time (--transformer-offload block); with --transformer-offload none
 it is moved to the GPU as a whole, like the other components. --transformer-path points at a
 full transformer checkpoint (e.g. pdmd_4NFE_full, or a LoRA fused by fuse_lora.py). Sampling
-uses time shift 12 for video and 3 for audio.
+uses time shift 12 for video and 6 for audio (3 for paper metrics).
 """
 import argparse
 import json
@@ -24,9 +24,9 @@ import torch  # noqa: E402
 from diffusers import ComponentsManager, MiniMaxH3Transformer3DModel, ModularPipeline  # noqa: E402
 
 MODEL_ID = "MiniMaxAI/MiniMax-H3"
-# Time shifts used for the PDMD results (the same values as the released scheduler configs)
+# Recommended time shifts
 VIDEO_SHIFT = 12.0
-AUDIO_SHIFT = 3.0
+AUDIO_SHIFT = 6.0  # Use 3.0 for paper metrics.
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--transformer-path", type=Path, required=True)
