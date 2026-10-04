@@ -121,7 +121,7 @@ for 2 NFE. Videos are written as `outputs/<job>_<index>_<N>nfe_seed<seed>.mp4`.
 `inference_steps` (see [`jobs/`](jobs) for examples). The example jobs generate a 14.4-second,
 1344×768 clip of a building-sized cat over a harbor, with sound, at seed 42. Sampling uses time shift 12 for video and no
 classifier-free guidance (MiniMax-H3 is guidance-distilled).
-We recommend **audio time shift 6**; use **3 for paper metrics**.
+For 2-NFE generation, we recommend **audio time shift 6**; use **3 for paper metrics**.
 Credit to [CALMDUST (@core_tan) on X](https://x.com/core_tan) for the suggestion.
 
 **Many videos.** `run_a10.py` takes ~25–30 min to load the model. To pay that once, pass several

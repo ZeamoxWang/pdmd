@@ -7,7 +7,7 @@ activations for long, high-resolution clips does not fit in 80GB, so by default 
 to the GPU one block at a time (--transformer-offload block); with --transformer-offload none
 it is moved to the GPU as a whole, like the other components. --transformer-path points at a
 full transformer checkpoint (e.g. pdmd_4NFE_full, or a LoRA fused by fuse_lora.py). Sampling
-uses time shift 12 for video and 6 for audio (3 for paper metrics).
+uses time shift 12 for video.
 """
 import argparse
 import json
@@ -26,7 +26,8 @@ from diffusers import ComponentsManager, MiniMaxH3Transformer3DModel, ModularPip
 MODEL_ID = "MiniMaxAI/MiniMax-H3"
 # Recommended time shifts
 VIDEO_SHIFT = 12.0
-AUDIO_SHIFT = 6.0  # Use 3.0 for paper metrics.
+AUDIO_SHIFT = 3.0
+AUDIO_SHIFT_2NFE = 6.0  # Use 3.0 for paper metrics.
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--transformer-path", type=Path, required=True)
@@ -109,6 +110,7 @@ log(f"offload ready (transformer: {args.transformer_offload}), shifts video="
 args.output_dir.mkdir(parents=True, exist_ok=True)
 for jobs_json, jobs in all_jobs:
     for index, (job, steps) in enumerate(jobs):
+        pipe.audio_scheduler.set_shift(AUDIO_SHIFT_2NFE if steps == 2 else AUDIO_SHIFT)
         width, height = resolve_output_size(job.megapixels, job.aspect_ratio)
         seed = args.seed + index
         log(f"{jobs_json.name} job {index}: {width}x{height}, {job.num_frames} frames, "
