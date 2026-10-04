@@ -119,8 +119,11 @@ for 2 NFE. Videos are written as `outputs/<job>_<index>_<N>nfe_seed<seed>.mp4`.
 
 **Jobs.** A job file lists prompts with their length, resolution and aspect ratio, plus an optional
 `inference_steps` (see [`jobs/`](jobs) for examples). The example jobs generate a 14.4-second,
-1344×768 clip of a building-sized cat over a harbor, with sound, at seed 42. Sampling uses time shift 12 for video and 3 for audio, and no
+1344×768 clip of a building-sized cat over a harbor, with sound, at seed 42. Sampling uses time shift 12 for video and no
 classifier-free guidance (MiniMax-H3 is guidance-distilled).
+For 2-NFE generation, we recommend **audio time shift 6**; use **3 for paper metrics**
+(the scripts default to `AUDIO_SHIFT = 3.0`; set it to `6.0` for the recommendation).
+Credit to [CALMDUST (@core_tan) on X](https://x.com/core_tan) for the suggestion.
 
 **Many videos.** `run_a10.py` takes ~25–30 min to load the model. To pay that once, pass several
 files to `--jobs-json`, or omit it and the script keeps running as a worker that picks up job files
