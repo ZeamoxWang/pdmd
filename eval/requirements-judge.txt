@@ -1,0 +1,7 @@
+# Install a CUDA-enabled PyTorch build and torchvision for your system first.
+transformers==5.12.1
+accelerate
+numpy
+pillow
+decord
+opencv-python
