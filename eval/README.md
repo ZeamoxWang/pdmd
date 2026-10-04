@@ -120,6 +120,7 @@ Please cite [VideoGen-Eval](https://arxiv.org/abs/2503.23452),
 It uses Audiobox's official predictor and the MMAudio
 [av-benchmark](https://github.com/hkchengrex/av-benchmark) preprocessing and models.
 A single GPU runs the stages sequentially. Input MP4 files must contain audio.
+The requirements pin Transformers 4.37.2 for Synchformer's bundled AST implementation.
 
 In a separate Python environment, install matching CUDA builds of
 `torch==2.8.0`, `torchvision==0.23.0`, and `torchaudio==2.8.0`, plus system
