@@ -1,87 +1,61 @@
-# PDMD audio evaluation
+# Audio evaluation
 
-This directory adapts the audio harness supplied in `zimo-internship-stuff.zip`.
-It reports PQ (Production Quality), CE (Content Enjoyment), CU (Content
-Usefulness), PaSST IS, ImageBind IB and Synchformer DeSync.
+Compute PQ, CE, CU, PaSST IS, ImageBind IB and Synchformer DeSync for generated videos.
 
-## Preserved protocol
+## Setup
 
-- `h3audio_core.py`: decode the entire first audio stream with PyAV, preserving
-  the native sample rate and channels.
-- `run_aesthetics.py`: pass the decoded tensor directly to `AesPredictor`, using
-  an explicit Audiobox `checkpoint.pt`. The default batch is 16. Per-clip values
-  are rounded to four decimals before aggregation, as in the supplied runner.
-- `run_avbench.py`: convert the full decoded audio to native-rate, native-channel
-  PCM16 (`clip(x, -1, 1) * 32767`), read it using SoundFile, and call the supplied
-  av-benchmark extraction and evaluation entry points. Use PyAV for video.
-  The dataset duration is **5.175 seconds**, copied from the supplied configuration.
-  Defaults are batch 32, video batch 8, and four data-loader workers.
-- IS is the upstream `ISC-PASST-mean`; IB and DeSync compare each column's audio
-  against that same column's video. No teacher videos are needed for these outputs.
-- `report.py` produces the per-column means for PQ/CE/CU and passes through
-  the column-level IS/IB/DeSync, with the source harness's rounding.
+Use Linux with CUDA-enabled PyTorch 2.8 and matching torchaudio. Install
+[Audiobox Aesthetics](https://github.com/facebookresearch/audiobox-aesthetics)
+(revision `2618e9d451b456e9328b39495b5e6234678aa550`) and
+[av-benchmark](https://github.com/hkchengrex/av-benchmark)
+(revision `f351b9a6fc6abde746d5f8e1d4c47c883319cb41`) with their dependencies, then:
 
-We removed company storage/download commands and deployment-specific directories.
-The published dataset uses a generic `PDMD` column and the original 387 IDs.
-Signal diagnostics and outputs outside the paper's six metrics are omitted.
-The original model calls, decoder choices and PCM conversion are retained.
-The local launcher uses one GPU, limits CPU threads, and runs groups sequentially.
-The source AV runner is column-sharded; the Audiobox runner is clip-sharded.
+```bash
+pip install -r eval/requirements-audio.txt
+pip install transformers==4.37.2
+```
 
-## Inputs and model bundle
-
-Arrange videos as `/path/to/video-root/PDMD/730.mp4` through `1116.mp4`.
-To evaluate another column, edit `columns` in a copy of `dataset.json` and pass
-its path as the fourth launcher argument. Keep work/output on the same filesystem
-as the videos because the AV stage makes hardlinks to its selected inputs.
-
-The original harness requires this bundle:
+Prepare the model weights and caches following the upstream setup instructions.
+Arrange the model directory as follows; the AV runner uses offline caches.
 
 ```text
 model-bundle/
   audiobox/checkpoint.pt
   avbench/
-    av-benchmark/          # exact source snapshot, including weights/
+    av-benchmark/          # source checkout, including weights/
     home/.cache/
-      huggingface/        # model cache used by the supplied harness
+      huggingface/
       torch/
-    cwd/                  # working directory, including .checkpoints/ if required
+    cwd/                  # working directory for upstream model assets
 ```
 
-**The ZIP contains the scoring scripts, but not this model bundle, its upstream
-source snapshot, or its wheel/version snapshot.** Supply those assets to retain
-the original environment. Installing a current av-benchmark checkout is a
-separate environment choice; this draft does not claim it matches that snapshot.
-The AV stage retains the source harness's offline cache configuration, without
-changing the user's HOME.
+## Run
 
-Use the matching CUDA PyTorch/torchaudio environment, install the supplied
-av-benchmark and Audiobox implementations, and install the small adapter
-requirements in `../requirements-audio.txt`. The existing public environment
-needed Transformers 4.37.2 for Synchformer's AST API; that is a known compatibility
-setting, not a recovered version from this archive.
+Place videos at `video-root/PDMD/730.mp4` through `1116.mp4`.
+Keep videos and output on the same filesystem because the runner uses hard links.
+From the repository root:
 
 ```bash
 AUDIO_PYTHON=/path/to/env/bin/python \
   bash eval/audio/score.sh /path/to/video-root /path/to/model-bundle /path/to/output
 ```
 
-Outputs are `parts/aesthetics/rank00.jsonl`, `parts/avbench/rank00.jsonl`,
-and `summary/summary.json`. A rerun overwrites the rank shard and may reuse the
-AV work cache; use a fresh output directory after changing videos, models,
-dataset duration or other settings. For separate stages and sharding, invoke
-the Python runners with `--help`.
+To score another video directory, edit `columns` in a copy of `dataset.json`
+and pass that file as the fourth argument. The launcher uses one GPU.
 
-## Measured result
+The default duration is 5.175 seconds. Audiobox uses the full PyAV-decoded audio
+at its native sample rate and channel count, with batch size 16. AV evaluation
+uses native-rate, native-channel PCM16 audio, PyAV video decoding, audio batch
+size 32, video batch size 8 and four workers. PQ, CE and CU are rounded per clip
+to four decimal places before averaging. IS, IB and DeSync use the upstream
+column-level evaluation; no reference videos are required.
 
-The mentor-derived harness completed all 387 PDMD clips on one A100 80GB,
-with 387 audio-quality records and 387 AV inputs, without reported errors.
-The full job took approximately 6.5 minutes including startup.
-See [scores and runtime settings](results/pdmd-vgeneval387.json).
+## Outputs
 
-| PQ | CE | CU | IS | IB | DeSync |
-| --- | --- | --- | --- | --- | --- |
-| 6.5296 | 4.0625 | 6.1802 | 4.976919 | 0.195332 | 0.802067 |
+- `parts/aesthetics/rank00.jsonl`: per-video PQ, CE and CU.
+- `parts/avbench/rank00.jsonl`: IS, IB and DeSync for each video directory.
+- `summary/summary.json`: aggregated scores.
 
-This run used the public upstream revisions recorded with the results;
-it does not establish an identical original company environment.
+Use a fresh output directory when changing inputs, models or scoring settings;
+the AV stage reuses cached features. Run individual scripts with `--help` for
+stage-specific and sharding options.

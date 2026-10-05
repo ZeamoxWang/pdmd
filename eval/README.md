@@ -44,10 +44,7 @@ pip install -r eval/requirements-judge.txt
 Use separate environments for VBench and the judge if their dependencies conflict.
 The runner accepts `QUALITY_PYTHON` and `JUDGE_PYTHON` as executable paths.
 Supply a local Hugging Face-format Qwen3.8-27B model directory containing its
-weights, configuration, tokenizer and processor. The judge dependency version
-matches the supplied scoring scripts; the public VBench installation is not the
-archived environment used for the paper, so exact numerical parity has not been
-verified.
+weights, configuration, tokenizer and processor.
 
 ## Run
 
@@ -100,9 +97,7 @@ Only prompts with the relevant annotation participate in each dimension.
 
 Semantic is the equal-weight mean of available semantic dimension scores, and
 `Total = (4 * Quality + Semantic) / 5`. Results are on the 0–1 scale; multiply by
-100 for percentage-style reporting. The supplied scoring and aggregation rules
-are preserved. This directory does not include an audio evaluator or prompt
-rewriting model pipeline.
+100 for percentage-style reporting. Audio evaluation is provided separately below.
 
 ## Files
 
@@ -118,16 +113,11 @@ Please cite [VideoGen-Eval](https://arxiv.org/abs/2503.23452),
 
 ## Audio evaluation
 
-The audio runner in [`audio/`](audio/README.md) is adapted from the supplied
-mentor harness. It replaces the previous `score_audio.py` implementation and
-reports only the paper's PQ, CE, CU, IS, IB and DeSync metrics.
+Compute PQ, CE, CU, IS, IB and DeSync:
 
 ```bash
 bash eval/audio/score.sh /path/to/video-root /path/to/model-bundle outputs/eval/audio
 ```
 
-See [audio setup and protocol](audio/README.md) for the required bundle layout
-and input naming. This replacement is a draft: syntax and aggregation have been
-checked, but the supplied archive does not contain its model bundle or dependency
-snapshot, and it has not been run on the cluster. Results from the former audio
-runner do not validate this replacement.
+See [audio setup and usage](audio/README.md) for dependencies, model preparation,
+input naming and outputs.
