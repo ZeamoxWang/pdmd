@@ -28,7 +28,7 @@ This repository contains:
 * 🪐 PDMD checkpoints at 4 NFE (full weights and LoRA) and 2 NFE (LoRA)
 * ⚡️ Inference scripts that run them on a single 24GB GPU ([`run_a10.py`](worker/run_a10.py)) or a single 80GB GPU ([`run_a100.py`](worker/run_a100.py))
 * 💥 A [tool](worker/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
-* 📊 [Video evaluation](eval/README.md): VBench quality and Qwen semantic scoring on 387 VideoGen-Eval prompts
+* 📊 [Video evaluation](eval/video/README.md): VBench quality and Qwen semantic scoring on 387 VideoGen-Eval prompts
 * 🔊 [Audio evaluation](eval/audio/README.md): PQ, CE, CU, IS, IB and DeSync
 
 > **Note.** The main script, `run_a10.py`, is optimized for GPUs with little memory, e.g. an NVIDIA A10

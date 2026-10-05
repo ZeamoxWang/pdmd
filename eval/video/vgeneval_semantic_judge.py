@@ -480,7 +480,7 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--max-side", type=int, default=0, help="downscale frames to this long side (0 = native)")
     ap.add_argument("--dims", default=",".join(ALL_DIMS))
-    ap.add_argument("--vocab", help="annotation JSON; use data/vocab_v4.json with aux-from-vocab")
+    ap.add_argument("--vocab", help="annotation JSON; use eval/prompt/vocab_v4.json with aux-from-vocab")
     a = ap.parse_args()
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     prompts = [(str(int(r["id"])), r["prompt"]) for r in map(json.loads, open(a.prompts))]

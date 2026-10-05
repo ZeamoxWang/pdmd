@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if [ "$#" -lt 3 ]; then
-  echo "Usage: bash eval/score.sh VIDEO_DIR JUDGE_MODEL_DIR OUTPUT_DIR [NUM_GPUS]"
+  echo "Usage: bash eval/video/score.sh VIDEO_DIR JUDGE_MODEL_DIR OUTPUT_DIR [NUM_GPUS]"
   echo "Optional: QUALITY_PYTHON, JUDGE_PYTHON, QUALITY_GPU, JUDGE_GPUS (comma-separated)."
   exit 2
 fi
@@ -17,8 +17,8 @@ QUALITY_PYTHON=${QUALITY_PYTHON:-python3}
 JUDGE_PYTHON=${JUDGE_PYTHON:-python3}
 QUALITY_GPU=${QUALITY_GPU:-0}
 IFS=',' read -r -a GPU_IDS <<< "${JUDGE_GPUS:-}"
-PROMPTS="$SCRIPT_DIR/data/prompts_vgeneval_t2v.jsonl"
-VOCAB="$SCRIPT_DIR/data/vocab_v4.json"
+PROMPTS="$SCRIPT_DIR/../prompt/prompts_vgeneval_t2v.jsonl"
+VOCAB="$SCRIPT_DIR/../prompt/vocab_v4.json"
 
 mkdir -p "$OUT/judge" "$OUT/quality" "$OUT/summary"
 "$QUALITY_PYTHON" "$SCRIPT_DIR/vgeneval_eval_info.py" \

@@ -11,7 +11,7 @@ Use Linux with CUDA-enabled PyTorch 2.8 and matching torchaudio. Install
 (revision `f351b9a6fc6abde746d5f8e1d4c47c883319cb41`) with their dependencies, then:
 
 ```bash
-pip install -r eval/requirements-audio.txt
+pip install -r eval/audio/requirements-audio.txt
 pip install transformers==4.37.2
 ```
 
@@ -40,7 +40,7 @@ AUDIO_PYTHON=/path/to/env/bin/python \
   bash eval/audio/score.sh /path/to/video-root /path/to/model-bundle /path/to/output
 ```
 
-To score another video directory, edit `columns` in a copy of `dataset.json`
+To score another video directory, edit `columns` in a copy of `eval/prompt/audio_dataset.json`
 and pass that file as the fourth argument. The launcher uses one GPU.
 
 The default duration is 5.175 seconds. Audiobox uses the full PyAV-decoded audio
