@@ -72,8 +72,16 @@ AV work cache; use a fresh output directory after changing videos, models,
 dataset duration or other settings. For separate stages and sharding, invoke
 the Python runners with `--help`.
 
-## Draft status
+## Measured result
 
-This replacement has been checked for syntax and report aggregation only.
-No GPU job has been started for it. Previous scores were produced by the removed
-runner and are not results of this supplied-harness adaptation.
+The mentor-derived harness completed all 387 PDMD clips on one A100 80GB,
+with 387 audio-quality records and 387 AV inputs, without reported errors.
+The full job took approximately 6.5 minutes including startup.
+See [scores and runtime settings](results/pdmd-vgeneval387.json).
+
+| PQ | CE | CU | IS | IB | DeSync |
+| --- | --- | --- | --- | --- | --- |
+| 6.5296 | 4.0625 | 6.1802 | 4.976919 | 0.195332 | 0.802067 |
+
+This run used the public upstream revisions recorded with the results;
+it does not establish an identical original company environment.
