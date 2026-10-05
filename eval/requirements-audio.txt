@@ -1,6 +1,5 @@
-# Install a matching CUDA torch/torchvision/torchaudio trio first (tested target: 2.8.0/0.23.0/2.8.0).
-audiobox_aesthetics @ git+https://github.com/facebookresearch/audiobox-aesthetics.git@2618e9d451b456e9328b39495b5e6234678aa550
+# Adapter dependencies. Install PyTorch/torchaudio, Audiobox and av-benchmark
+# from the supplied model/environment bundle; its version snapshot is not in the ZIP.
 numpy<2
-
-# Synchformer uses the Transformers 4.x AST attention API.
-transformers==4.37.2
+av
+soundfile
