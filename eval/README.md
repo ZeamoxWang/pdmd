@@ -64,6 +64,9 @@ bash eval/score.sh /path/to/videos /path/to/Qwen3.8-27B outputs/eval/run1
 ```
 
 The quality dimensions run sequentially on GPU 0, followed by the semantic judge.
+The quality adapter limits PyTorch and OpenCV to two CPU threads to avoid
+thread oversubscription in CPU-limited GPU containers. When calling
+`vgeneval_quality.py` directly, override this with `--cpu-threads`.
 For four judge replicas, with separate environments:
 
 ```bash

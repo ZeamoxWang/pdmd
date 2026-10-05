@@ -15,9 +15,15 @@ def main():
     parser.add_argument("--out", required=True, help="quality results directory")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--local", action="store_true", help="use VBench's local model assets")
+    parser.add_argument("--cpu-threads", type=int, default=2, help="CPU threads for PyTorch and OpenCV (default: 2)")
     args = parser.parse_args()
+    if args.cpu_threads < 1:
+        parser.error("--cpu-threads must be positive")
 
     import torch
+    import cv2
+    torch.set_num_threads(args.cpu_threads)
+    cv2.setNumThreads(args.cpu_threads)
     from vbench.utils import init_submodules
 
     assets = init_submodules([args.dimension], local=args.local, read_frame=False)
