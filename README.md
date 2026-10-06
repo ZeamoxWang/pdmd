@@ -165,25 +165,8 @@ peak GPU memory of 62.5 GiB.
 The 2-NFE LoRA still shows some painterly, oil-painting-like texture, oversaturation and degraded
 audio, but as of the end of September 2026 it is, to our knowledge, the only publicly released 2-NFE
 distilled LoRA for MiniMax-H3. In some scenes its samples are on par with those of the 4-NFE
-checkpoint, though overall a gap to 4 NFE remains. Below are four prompts, each sampled at 2 NFE and
+checkpoint, though overall a gap to 4 NFE remains. Below are three prompts, each sampled at 2 NFE and
 at 4 NFE (with sound); more videos are on the [project page](https://pdmd2026.github.io/).
-
-### The viaduct
-
-<details>
-<summary>Prompt</summary>
-
-[Shot 1] Live-action, cinematic, a medium-wide view from a mountain station terrace frames a slender elevated viaduct between green summits in bright morning light. The rounded nose of a streamlined ivory train with a teal window band enters from the left and moves smoothly past the camera, white platform columns reflected in its dark windows with a few seated passengers as quiet silhouettes. The camera pans right at slow speed to follow the first carriage, revealing the track extending out over a cloud-filled valley with the departure already underway. [Shot 2] At 00:04.000, the camera cuts to a wide lateral aerial view of the complete six-carriage train crossing the viaduct. The camera tracks at matching speed while regularly spaced white supports pass beneath and the valley clouds stay far below the track; a green summit with a small glass station appears ahead as the train follows a gentle curve, its carriages physically connected and its wheels aligned to the rail. [Shot 3] At 00:09.000, the shot cuts to an elevated view from beyond the destination summit as the train rounds the final curve toward the glass station. The camera pulls out with large amplitude at slow speed to reveal the viaduct connecting several mountain peaks, sunlight on the ivory carriages and station roof, soft blue shadows beneath the bridge, and the original departure terrace faintly visible in the distance, ending with the train still moving and open blue sky above. overall_soundscape: Steel wheels run over rail joints in an even rhythmic pattern beneath a smooth electric traction hum. Air rushes along the carriage sides and changes tone as the train passes the camera, and a high mountain wind crosses the viaduct supports between passes. non_diegetic_music: A repeating piano figure at a moderate tempo with sustained strings and a light rhythmic pulse, broadening in volume through the final wide view.
-
-</details>
-
-**2 NFE**
-
-https://github.com/user-attachments/assets/d1f3a96b-bd9f-4f76-a8d7-fe5f733ff606
-
-**4 NFE**
-
-https://github.com/user-attachments/assets/f793e523-5f6c-40e5-a6e9-00b86e8b952b
 
 ### The red footbridge
 
