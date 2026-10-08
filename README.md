@@ -172,11 +172,11 @@ peak GPU memory of 62.5 GiB.
 
 ### Training setup
 
-Use a separate Python 3.10+ environment from the inference workers above. Training and benchmark
+Use a separate Python 3.11 environment from the inference workers above. Training and benchmark
 sampling use the pinned DiffSynth-Studio MiniMax-H3 implementation. Run commands from this repository's root:
 
 ```bash
-python3 -m venv .venv-training
+python3.11 -m venv .venv-training
 source .venv-training/bin/activate
 pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0
 pip install -r training/requirements.txt
