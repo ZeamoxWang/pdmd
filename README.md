@@ -202,6 +202,8 @@ Set `MODEL_ROOT` and `CACHE_ROOT` to use local model and embedding copies. To pr
 python tools/download_assets.py --model-root /data/MiniMax-H3 --cache-root /data/pdmd-cache
 ```
 
+**FSDP and async checkpointing.** Multi-GPU training uses [FSDP](src/pdmd/distributed.py) to shard the frozen base within each node; student and critic LoRAs remain replicated, with gradients synchronized across all workers. [Checkpoint serialization and disk writes](src/pdmd/checkpoint.py) run in a background thread after a CPU snapshot is captured, allowing training to continue during disk I/O.
+
 **Outputs.** The student LoRA is saved every 500 iterations to `runs/pdmd_4nfe/milestones/iter_NNNNNN/student_lora.safetensors`; the reported reproduction is `iter_002500`. Re-running the command resumes from the latest state, saved every 100 iterations.
 
 **Time.** 2,500 iterations take about 20 hours on 2×8 H100 (29.5 s per iteration, 45.6 GiB peak memory per GPU). One node also works and reaches the same batch by gradient accumulation.
