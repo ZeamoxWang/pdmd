@@ -7,6 +7,10 @@
 
 ![PDMD samples](assets/teaser.jpg)
 
+https://github.com/user-attachments/assets/f24d8268-4e2c-43c2-9e95-94dd3de8b9d3
+
+<sub>Every frame is 4 network evaluations. Music: "Goliath" by Scott Buckley, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).</sub>
+
 This repo contains training, inference and evaluation code for PDMD on MiniMax-H3-33B joint
 video–audio generation. Train a four-step student from the base model, or run the released four-
 and two-step checkpoints on a single 24GB or 80GB GPU. More videos, with sound, are on
@@ -33,7 +37,7 @@ the best score on all six audio metrics among the compared 4-NFE models.
 This repository contains:
 
 * 🏋️ [Multi-node training](#training) of student and critic LoRAs, with automatic model and training-data downloads
-* 🪐 PDMD checkpoints at 4 NFE (full weights and LoRA) and 2 NFE (LoRA)
+* 🪐 PDMD LoRA checkpoints at 4 NFE and 2 NFE
 * ⚡️ Inference scripts that run them on a single 24GB GPU ([`run_low_vram.py`](inference/run_low_vram.py)) or a single 80GB GPU ([`run_bf16.py`](inference/run_bf16.py))
 * 💥 A [tool](tools/checkpoints/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
 * 📊 [Video evaluation](evaluation/video/README.md): VBench quality and Qwen semantic scoring on 387 VideoGen-Eval prompts
@@ -77,11 +81,15 @@ git -C Minimax-H3-Turbo checkout 02e26d591f7a04d5d1a074c9566d5dd4f22f6225
 
 ## Pre-trained checkpoints
 
+We train only LoRA adapters, keeping the base transformer frozen. Download the LoRA for your
+desired NFE and use it with MiniMax-H3; you do not need to download a separate full PDMD transformer.
+
 | Model | NFE | Type | Size | Download |
 |---|---|---|---|---|
-| PDMD | 4 | full transformer | 66 GB | [pdmd2026/pdmd_4NFE_full](https://huggingface.co/pdmd2026/pdmd_4NFE_full) |
 | PDMD | 4 | LoRA (rank 128) | 1.4 GB | [pdmd2026/pdmd_4NFE_lora](https://huggingface.co/pdmd2026/pdmd_4NFE_lora) |
 | PDMD | 2 | LoRA (rank 128) | 1.4 GB | [pdmd2026/pdmd_2NFE_lora](https://huggingface.co/pdmd2026/pdmd_2NFE_lora) |
+
+The [full merged 4-NFE transformer](https://huggingface.co/pdmd2026/pdmd_4NFE_full) (~66 GB) is also available if needed.
 
 All checkpoints are for the base `transformer/` of MiniMax-H3 (the FL2VA/T2VA partition), which
 also provides the text encoder, VAEs and schedulers. Download the base model and the checkpoint(s)
@@ -89,18 +97,8 @@ you want to run; the checkpoints are independent of each other:
 
 ```bash
 hf download MiniMaxAI/MiniMax-H3 --exclude "transformer_ref/*" --exclude "FL2VA/*" --exclude "Ref2VA/*"
-hf download pdmd2026/pdmd_4NFE_full --local-dir ckpt/pdmd_4NFE_full
 hf download pdmd2026/pdmd_4NFE_lora --local-dir ckpt/pdmd_4NFE_lora
 hf download pdmd2026/pdmd_2NFE_lora --local-dir ckpt/pdmd_2NFE_lora
-```
-
-The 4-NFE full transformer is a drop-in replacement for the base model's transformer:
-
-```python
-import torch
-from diffusers import MiniMaxH3Transformer3DModel
-
-transformer = MiniMaxH3Transformer3DModel.from_pretrained("pdmd2026/pdmd_4NFE_full", torch_dtype=torch.bfloat16)
 ```
 
 The LoRAs cover the attention projections and both feed-forward layers of every transformer and
@@ -119,12 +117,12 @@ number of steps. For example, with the 4-NFE checkpoint:
 
 ```bash
 python inference/run_low_vram.py \
-  --transformer-path ckpt/pdmd_4NFE_full --inference-steps 4 \
+  --transformer-path ckpt/pdmd_4NFE_fused --inference-steps 4 \
   --jobs-json inference/examples/giant_cat_harbor_768p_4nfe.json \
   --turbo-repo Minimax-H3-Turbo --output-dir outputs
 ```
 
-Use `--transformer-path ckpt/pdmd_4NFE_fused` for the 4-NFE LoRA, or
+Use
 `--transformer-path ckpt/pdmd_2NFE_fused --inference-steps 2 --jobs-json inference/examples/giant_cat_harbor_768p_2nfe.json`
 for 2 NFE. Videos are written as `outputs/<job>_<index>_<N>nfe_seed<seed>.mp4`.
 
@@ -155,7 +153,7 @@ which takes the same arguments:
 
 ```bash
 python inference/run_bf16.py \
-  --transformer-path ckpt/pdmd_4NFE_full --inference-steps 4 \
+  --transformer-path ckpt/pdmd_4NFE_fused --inference-steps 4 \
   --jobs-json inference/examples/giant_cat_harbor_768p_4nfe.json \
   --turbo-repo Minimax-H3-Turbo --output-dir outputs
 ```
