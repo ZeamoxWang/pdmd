@@ -136,7 +136,7 @@ https://github.com/user-attachments/assets/b3906199-6f02-4232-b995-003da2e01b6f
 
 **PDMD (training reproduction, 2,500 iterations), 4 NFE**
 
-https://github.com/user-attachments/assets/325b984b-3523-4f9d-81dd-530ed7dddccd
+https://github.com/user-attachments/assets/c2b0d9a8-45b7-4b54-8947-d03ba586dfc4
 
 A steampunk creature with a brass lantern for a head walks through fog-filled ruins, with
 heavy footsteps, clicking gears, steam hisses and a low drone (14 s, 1344×768).
