@@ -1,6 +1,9 @@
 ## PDMD: Projected Distribution Matching Distillation for Video Diffusion Models
 
-### [Paper](https://arxiv.org/abs/2609.35768) | [Project Page](https://pdmd2026.github.io/) | [Hugging Face](https://huggingface.co/pdmd2026) | [Training Data](https://huggingface.co/datasets/pdmd2026/rcm-vidprom-h3-qwenvl-cache)
+[![Project Page](https://img.shields.io/badge/Project-Page-yellow?logo=googlechrome&logoColor=yellow)](https://pdmd2026.github.io/)
+[![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv&logoColor=red)](https://arxiv.org/abs/2609.35768)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-PDMD-blue)](https://huggingface.co/pdmd2026)
+[![Training Data](https://img.shields.io/badge/%F0%9F%A4%97%20Training-Data-orange)](https://huggingface.co/datasets/pdmd2026/rcm-vidprom-h3-qwenvl-cache)
 
 ![PDMD samples](visuals/teaser.jpg)
 
