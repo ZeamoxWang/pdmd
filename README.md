@@ -12,8 +12,8 @@ video–audio generation. Train a four-step student from the base model, or run 
 and two-step checkpoints on a single 24GB or 80GB GPU. More videos, with sound, are on
 our [project page](https://pdmd2026.github.io/).
 
-[Training](#training) · [Checkpoints](#pre-trained-checkpoints) · [Sampling](#sampling) ·
-[Evaluation](#evaluation) · [Training results](#training-results)
+[📦 Checkpoints](#pre-trained-checkpoints) · [🎬 Sampling](#sampling) · [🏋️ Training](#training) ·
+[📈 Training results](#training-results) · [📊 Evaluation](#evaluation)
 
 > [**PDMD: Projected Distribution Matching Distillation for Video Diffusion Models**](https://arxiv.org/abs/2609.35768)<br>
 > Zimo Wang, Junkun Yuan, Angtian Wang, Haotian Yang, Canyu Zhang, Siyuan Yuan, Xingchang Huang,
