@@ -111,40 +111,6 @@ python worker/fuse_lora.py --lora ckpt/pdmd_2NFE_lora/lora_model_0.safetensors -
 ```
 
 
-## Training results
-
-The training reproduction uses 2 nodes of 8 H100s and finishes 2,500 updates in about 20 hours
-(29.5 s per update, approximately 10.4k tokens/s, 45.6 GiB peak memory per GPU).
-The reported VideoGen-Eval results use 387 prompts at 544p with seed 42. Higher is better,
-except DeSync. The paper checkpoints above and this training reproduction are separate models.
-
-| Model | NFE | Total | Quality | Dynamic | Semantic | PQ | CE | CU | IS | IB | DeSync ↓ |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| MiniMax-H3-33B teacher | 50 | 82.41 | 82.22 | 66.67 | **83.20** | **6.567** | **4.188** | **6.213** | 5.15 | **0.229** | **0.797** |
-| PDMD (paper) | 4 | 83.17 | 83.25 | **71.83** | 82.86 | 6.530 | 4.062 | 6.180 | 4.98 | 0.195 | 0.802 |
-| PDMD (training reproduction, 2,500 iterations) | 4 | **83.23** | **83.30** | 68.99 | 82.92 | 6.518 | 4.164 | 6.178 | **5.42** | 0.198 | 0.801 |
-
-The 2,500-iteration reproduction improves Total and Semantic over the paper model, with lower
-Dynamic. The reported scores use the video and audio workflows in [Evaluation](#evaluation).
-
-<details>
-<summary>Lantern-head: paper model and training reproduction, same prompt and seed</summary>
-
-**PDMD (paper), 4 NFE**
-
-https://github.com/user-attachments/assets/b3906199-6f02-4232-b995-003da2e01b6f
-
-**PDMD (training reproduction, 2,500 iterations), 4 NFE**
-
-https://github.com/user-attachments/assets/c2b0d9a8-45b7-4b54-8947-d03ba586dfc4
-
-A steampunk creature with a brass lantern for a head walks through fog-filled ruins, with
-heavy footsteps, clicking gears, steam hisses and a low drone (14 s, 1344×768).
-The full prompt is in [Lantern-head](#lantern-head).
-
-</details>
-
-
 ## Sampling
 
 Generate a video with [`worker/run_a10.py`](worker/run_a10.py), passing the PDMD transformer and the
@@ -203,6 +169,40 @@ peak GPU memory of 62.5 GiB.
 
 
 ## Training
+
+### Training results
+
+The training reproduction uses 2 nodes of 8 H100s and finishes 2,500 updates in about 20 hours
+(29.5 s per update, approximately 10.4k tokens/s, 45.6 GiB peak memory per GPU).
+The reported VideoGen-Eval results use 387 prompts at 544p with seed 42. Higher is better,
+except DeSync. The paper checkpoints above and this training reproduction are separate models.
+
+| Model | NFE | Total | Quality | Dynamic | Semantic | PQ | CE | CU | IS | IB | DeSync ↓ |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| MiniMax-H3-33B teacher | 50 | 82.41 | 82.22 | 66.67 | **83.20** | **6.567** | **4.188** | **6.213** | 5.15 | **0.229** | **0.797** |
+| PDMD (paper) | 4 | 83.17 | 83.25 | **71.83** | 82.86 | 6.530 | 4.062 | 6.180 | 4.98 | 0.195 | 0.802 |
+| PDMD (training reproduction, 2,500 iterations) | 4 | **83.23** | **83.30** | 68.99 | 82.92 | 6.518 | 4.164 | 6.178 | **5.42** | 0.198 | 0.801 |
+
+The 2,500-iteration reproduction improves Total and Semantic over the paper model, with lower
+Dynamic. The reported scores use the video and audio workflows in [Evaluation](#evaluation).
+
+<details>
+<summary>Lantern-head: paper model and training reproduction, same prompt and seed</summary>
+
+**PDMD (paper), 4 NFE**
+
+https://github.com/user-attachments/assets/b3906199-6f02-4232-b995-003da2e01b6f
+
+**PDMD (training reproduction, 2,500 iterations), 4 NFE**
+
+https://github.com/user-attachments/assets/c2b0d9a8-45b7-4b54-8947-d03ba586dfc4
+
+A steampunk creature with a brass lantern for a head walks through fog-filled ruins, with
+heavy footsteps, clicking gears, steam hisses and a low drone (14 s, 1344×768).
+The full prompt is in [Lantern-head](#lantern-head).
+
+</details>
+
 
 ### Training setup
 
