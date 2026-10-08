@@ -1,7 +1,4 @@
 
-
-https://github.com/user-attachments/assets/a7482145-3364-46f2-9ce0-439e584de3e6
-
 ## PDMD: Projected Distribution Matching Distillation for Video Diffusion Models
 
 [![Project Page](https://img.shields.io/badge/Project-Page-yellow?logo=googlechrome&logoColor=yellow)](https://pdmd2026.github.io/)
@@ -11,7 +8,7 @@ https://github.com/user-attachments/assets/a7482145-3364-46f2-9ce0-439e584de3e6
 
 ![PDMD samples](assets/teaser.jpg)
 
-https://github.com/user-attachments/assets/f24d8268-4e2c-43c2-9e95-94dd3de8b9d3
+https://github.com/user-attachments/assets/a7482145-3364-46f2-9ce0-439e584de3e6
 
 <sub>Every frame is 4 network evaluations. Music: "Goliath" by Scott Buckley, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).</sub>
 
