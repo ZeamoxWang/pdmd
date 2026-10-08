@@ -255,9 +255,6 @@ python scripts/download_assets.py --model-root /data/MiniMax-H3 --cache-root /da
 | DMD query | reached along the student's own prediction |
 | Losses | MSE, 0.8 per modality, clamped at 5 |
 
-The default `"method": "projected_dmd"` enables projection. Set `"method": "dmd"` in a separate
-config and pass `CONFIG=path/to/config.json` to run the unprojected control in a new output directory.
-
 </details>
 
 <details>
@@ -267,6 +264,58 @@ The frozen base is sharded across the 8 GPUs of a node, so most memory goes to a
 Set `"optimizer_state_offload": true` in the config to target **40 GB** GPUs.
 Also use fewer `frames` (e.g. 73) or smaller `buckets` to target **32 GB** GPUs; this changes the training distribution, so expect the scores to move.
 Both are estimates from the 80 GB run, not measured runs.
+
+</details>
+
+
+<details>
+<summary>Ablation: DMD without projection</summary>
+
+To run the unprojected DMD control, copy the PDMD recipe and change only `"method"` from
+`"projected_dmd"` to `"dmd"`. This keeps the same rollout, critic updates, loss weights and
+normalization, so the ablation isolates the projection. It does not reproduce a separately
+tuned DMD baseline from the paper.
+
+Create the config on each node (or once on shared storage):
+
+```bash
+python - <<'PYCONFIG'
+import json
+from pathlib import Path
+
+config = json.loads(Path("configs/pdmd_4nfe_544p.json").read_text())
+config["method"] = "dmd"
+Path("configs/dmd_4nfe_544p.json").write_text(json.dumps(config, indent=2) + "\n")
+PYCONFIG
+```
+
+Launch on both nodes, setting `NODE_RANK` to `0` or `1` and replacing `NODE0_IP` with node 0's
+reachable address. Use a new output directory to start the control from the base model:
+
+```bash
+CONFIG=configs/dmd_4nfe_544p.json OUTPUT=runs/dmd_4nfe \
+NNODES=2 NODE_RANK=0 MASTER_ADDR=NODE0_IP bash scripts/train.sh
+```
+
+**Where the switch acts:**
+
+1. [Config line 2](https://github.com/ZeamoxWang/pdmd/blob/ecb36d3b01d3e8930d733a0f51e53dd2e198aa99/configs/pdmd_4nfe_544p.json#L2) sets `"method": "projected_dmd"` by default.
+2. [`scripts/train.py`, line 196](https://github.com/ZeamoxWang/pdmd/blob/ecb36d3b01d3e8930d733a0f51e53dd2e198aa99/scripts/train.py#L196) reads it:
+
+   ```python
+   projected = cfg.get('method', 'projected_dmd') == 'projected_dmd'
+   ```
+
+3. [`pdmd_training/objectives.py`, lines 55–56](https://github.com/ZeamoxWang/pdmd/blob/ecb36d3b01d3e8930d733a0f51e53dd2e198aa99/pdmd_training/objectives.py#L55-L56)
+   apply the projection only when enabled:
+
+   ```python
+   if projected:
+       direction = project_update(direction, p_fake, eps)
+   ```
+
+The projection itself is in [`project_update`, lines 12–25](https://github.com/ZeamoxWang/pdmd/blob/ecb36d3b01d3e8930d733a0f51e53dd2e198aa99/pdmd_training/objectives.py#L12-L25).
+To switch back to PDMD, use `CONFIG=configs/pdmd_4nfe_544p.json` and a separate output directory.
 
 </details>
 
