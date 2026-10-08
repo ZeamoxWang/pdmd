@@ -37,10 +37,9 @@ the best score on all six audio metrics among the compared 4-NFE models.
 
 This repository contains:
 
-* 🏋️ [Multi-node training](#training) of student and critic LoRAs, with automatic model and training-data downloads
 * 🪐 PDMD LoRA checkpoints at 4 NFE and 2 NFE
 * ⚡️ Inference scripts that run them on a single 24GB GPU ([`run_low_vram.py`](inference/run_low_vram.py)) or a single 80GB GPU ([`run_bf16.py`](inference/run_bf16.py))
-* 💥 A [tool](tools/checkpoints/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
+* 🏋️ [Multi-node training](#training) of student and critic LoRAs, with automatic model and training-data downloads
 * 📊 [Video evaluation](evaluation/video/README.md): VBench quality and Qwen semantic scoring on 387 VideoGen-Eval prompts
 * 🔊 [Audio evaluation](evaluation/audio/README.md): PQ, CE, CU, IS, IB and DeSync
 
