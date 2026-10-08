@@ -1,0 +1,146 @@
+{
+  "method": "projected_dmd",
+  "base_model": "MiniMaxAI/MiniMax-H3",
+  "base_revision": "42ed227ee7df40d41602854ae760620d6eb651fe",
+  "partition": "FL2VA",
+  "nfe": 4,
+  "train_video_shift": 1.0,
+  "train_audio_shift": 1.0,
+  "video_shift": 12.0,
+  "audio_shift": 3.0,
+  "lora_rank": 128,
+  "lora_alpha": 128,
+  "student_lr": 5e-05,
+  "critic_lr": 1e-05,
+  "adam_betas": [
+    0.0,
+    0.9
+  ],
+  "adam_eps": 1e-08,
+  "weight_decay": 0.0,
+  "gradient_clip": 1.0,
+  "critic_steps": 5,
+  "global_batch": 16,
+  "iterations": 6,
+  "save_every": 3,
+  "milestone_every": 6,
+  "loss_weights": [
+    0.8,
+    0.8
+  ],
+  "loss_clamp": 5.0,
+  "normalizer_floor": 1e-05,
+  "projection_eps": 1e-08,
+  "critic_video_threshold": 0.95,
+  "critic_audio_floor": 0.85,
+  "frames": 124,
+  "buckets": [
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      544,
+      960
+    ],
+    [
+      960,
+      544
+    ],
+    [
+      960,
+      544
+    ],
+    [
+      960,
+      544
+    ],
+    [
+      960,
+      544
+    ],
+    [
+      640,
+      832
+    ],
+    [
+      832,
+      640
+    ],
+    [
+      736,
+      736
+    ],
+    [
+      480,
+      1120
+    ]
+  ],
+  "seed": 42,
+  "expected_prompts": 248221,
+  "require_cache_audit": true,
+  "provenance": {
+    "prompts": {
+      "source_url": "https://huggingface.co/gdhe17/Self-Forcing/resolve/2f8b779212da279d212c22a509b66ad6552f350e/vidprom_filtered_extended.txt",
+      "source_revision": "2f8b779212da279d212c22a509b66ad6552f350e",
+      "source_sha256": "7896742f468bc8aef9e4547424d1ce0a951acdb2a82233790155401a99bf5aa5",
+      "rcm_reference": "https://github.com/NVlabs/rcm/blob/ed3cb14dd936f92cdc9f9381af7369991509b41f/README.md#dataset-downloading",
+      "records": 248221,
+      "max_characters": 1424,
+      "output_sha256": "c1cc7c4dec5de642fcf02d695763034744bfebd0136107eb11d8e0018ef04904",
+      "output": "data/rcm-public/prompts.jsonl",
+      "additional_rewrite": false,
+      "filtering": false,
+      "text_preservation": "Only physical line separators removed; source spaces preserved",
+      "source_text_status": "Published rCM-linked extended text, used verbatim"
+    },
+    "recipe": "Settings of the run behind the paper's 4-NFE H3 result; see README 'Recipe'.",
+    "train_shift": "The student's training rollout uses the UNSHIFTED 4-step grid [1, .75, .5, .25, 0] for video and audio; video_shift/audio_shift (12/3) are the sampling shifts used at inference only.",
+    "buckets": "544p, 20 equally likely entries (height, width): 12x 544x960, 4x 960x544, one each of 640x832, 832x640, 736x736, 480x1120.",
+    "frames": "124 frames at 24 fps (37 video latents, 207 audio latents).",
+    "critic_time": "video sigma ~ U(0,1); audio sigma ~ U(0,1), redrawn from U(.85,1) when video sigma > .95.",
+    "score_time": "sigma'' ~ U(sigma[k+1], sigma[k]) below the student's step k, one ratio shared by video and audio.",
+    "losses": "MSE without the 0.5 factor, weighted 0.8 per modality, each clamped to at most 5; gradient norm clipped at 1.0 per role.",
+    "purpose": "full-shape smoke test: 6 updates = 5 critic + 1 student, rolling checkpoint at 3 and 6, LoRA milestone at 6"
+  }
+}

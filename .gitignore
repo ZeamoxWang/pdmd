@@ -2,3 +2,12 @@
 __pycache__/
 *.pyc
 outputs/
+.venv/
+data/
+models/
+*.egg-info/
+.venv-training/
+runs/
+renders/
+scores/
+av-benchmark/

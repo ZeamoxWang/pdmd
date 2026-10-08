@@ -1,0 +1,15 @@
+# Install in a dedicated environment; never upgrade another task's environment.
+transformers==5.17.0
+accelerate==1.15.0
+peft==0.21.0
+safetensors==0.8.0
+huggingface-hub==1.33.0
+numpy
+einops
+modelscope
+ftfy
+pandas
+imageio[ffmpeg]
+diffsynth @ git+https://github.com/modelscope/DiffSynth-Studio.git@974cfa37f27ac55eba3b6d10efa21f876900572d
+torchaudio
+av

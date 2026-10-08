@@ -1,12 +1,16 @@
 ## PDMD: Projected Distribution Matching Distillation for Video Diffusion Models
 
-### [Paper](https://arxiv.org/abs/2609.35768) | [Project Page](https://pdmd2026.github.io/) | [Hugging Face](https://huggingface.co/pdmd2026)
+### [Paper](https://arxiv.org/abs/2609.35768) | [Project Page](https://pdmd2026.github.io/) | [Hugging Face](https://huggingface.co/pdmd2026) | [Training Data](https://huggingface.co/datasets/pdmd2026/rcm-vidprom-h3-qwenvl-cache)
 
 ![PDMD samples](visuals/teaser.jpg)
 
-This repo contains four- and two-step PDMD checkpoints for joint video–audio generation (distilled
-from MiniMax-H3-33B), and code to run them on a single 24GB or 80GB GPU. You can find more videos, with
-sound, on our [project page](https://pdmd2026.github.io/).
+This repo contains training, inference and evaluation code for PDMD on MiniMax-H3-33B joint
+video–audio generation. Train a four-step student from the base model, or run the released four-
+and two-step checkpoints on a single 24GB or 80GB GPU. More videos, with sound, are on
+our [project page](https://pdmd2026.github.io/).
+
+[Training](#training) · [Checkpoints](#pre-trained-checkpoints) · [Sampling](#sampling) ·
+[Evaluation](#evaluation) · [Training results](#training-results)
 
 > [**PDMD: Projected Distribution Matching Distillation for Video Diffusion Models**](https://arxiv.org/abs/2609.35768)<br>
 > Zimo Wang, Junkun Yuan, Angtian Wang, Haotian Yang, Canyu Zhang, Siyuan Yuan, Xingchang Huang,
@@ -25,6 +29,7 @@ the best score on all six audio metrics among the compared 4-NFE models.
 
 This repository contains:
 
+* 🏋️ [Multi-node training](#training) of student and critic LoRAs, with automatic model and training-data downloads
 * 🪐 PDMD checkpoints at 4 NFE (full weights and LoRA) and 2 NFE (LoRA)
 * ⚡️ Inference scripts that run them on a single 24GB GPU ([`run_a10.py`](worker/run_a10.py)) or a single 80GB GPU ([`run_a100.py`](worker/run_a100.py))
 * 💥 A [tool](worker/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
@@ -48,7 +53,10 @@ git clone https://github.com/ZeamoxWang/pdmd.git
 cd pdmd
 ```
 
-Install the dependencies (the versions we tested):
+The instructions below set up the Diffusers-based inference workers. For training and the
+DiffSynth-based benchmark sampler, use the separate environment in [Training setup](#training-setup).
+
+Install the inference dependencies (the versions we tested):
 
 ```bash
 pip install torch==2.14.0 torchvision==0.29.0 torchaudio==2.11.0
@@ -101,6 +109,40 @@ token-refiner block, and are fused into the base transformer once (on CPU, ~15 m
 python worker/fuse_lora.py --lora ckpt/pdmd_4NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_4NFE_fused
 python worker/fuse_lora.py --lora ckpt/pdmd_2NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_2NFE_fused
 ```
+
+
+## Training results
+
+The training reproduction uses 2 nodes of 8 H100s and finishes 2,500 updates in about 20 hours
+(29.5 s per update, approximately 10.4k tokens/s, 45.6 GiB peak memory per GPU).
+The reported VideoGen-Eval results use 387 prompts at 544p with seed 42. Higher is better,
+except DeSync. The paper checkpoints above and this training reproduction are separate models.
+
+| Model | NFE | Total | Quality | Dynamic | Semantic | PQ | CE | CU | IS | IB | DeSync ↓ |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| MiniMax-H3-33B teacher | 50 | 82.41 | 82.22 | 66.67 | **83.20** | **6.567** | **4.188** | **6.213** | 5.15 | **0.229** | **0.797** |
+| PDMD (paper) | 4 | 83.17 | 83.25 | **71.83** | 82.86 | 6.530 | 4.062 | 6.180 | 4.98 | 0.195 | 0.802 |
+| PDMD (training reproduction, 2,500 iterations) | 4 | **83.23** | **83.30** | 68.99 | 82.92 | 6.518 | 4.164 | 6.178 | **5.42** | 0.198 | 0.801 |
+
+The 2,500-iteration reproduction improves Total and Semantic over the paper model, with lower
+Dynamic. The reported scores use the video and audio workflows in [Evaluation](#evaluation).
+
+<details>
+<summary>Lantern-head: paper model and training reproduction, same prompt and seed</summary>
+
+**PDMD (paper), 4 NFE**
+
+https://github.com/user-attachments/assets/b3906199-6f02-4232-b995-003da2e01b6f
+
+**PDMD (training reproduction, 2,500 iterations), 4 NFE**
+
+https://github.com/user-attachments/assets/325b984b-3523-4f9d-81dd-530ed7dddccd
+
+A steampunk creature with a brass lantern for a head walks through fog-filled ruins, with
+heavy footsteps, clicking gears, steam hisses and a low drone (14 s, 1344×768).
+The full prompt is in [Lantern-head](#lantern-head).
+
+</details>
 
 
 ## Sampling
@@ -158,6 +200,130 @@ activations of a long 768p clip do not fit in 80GB (`--transformer-offload none`
 transformer on the GPU, for shorter or lower-resolution clips). It also needs 128GB of host RAM. On
 an A100 80GB at 1344×768 and 345 frames, a 4-NFE video takes ~10 min (~7.7 min denoising), with a
 peak GPU memory of 62.5 GiB.
+
+
+## Training
+
+### Training setup
+
+Use a separate Python 3.10+ environment from the inference workers above. Training and benchmark
+sampling use the pinned DiffSynth-Studio MiniMax-H3 implementation. Run commands from this repository's root:
+
+```bash
+python3 -m venv .venv-training
+source .venv-training/bin/activate
+pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0
+pip install -r requirements.txt
+pip install -e .
+python -m unittest discover -s tests -t .
+```
+
+Install a CUDA build of PyTorch on the training machines. `flash-attn` is optional.
+For audio scoring, also run `pip install -r requirements-audio.txt`.
+
+### Launch and data
+
+Run on each of 2 nodes with 8 GPUs:
+
+```bash
+OUTPUT=runs/pdmd_4nfe NNODES=2 NODE_RANK=<0|1> MASTER_ADDR=<node 0 address> bash scripts/train.sh
+```
+
+**Data downloads itself.** The base model [MiniMaxAI/MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) and the training data [pdmd2026/rcm-vidprom-h3-qwenvl-cache](https://huggingface.co/datasets/pdmd2026/rcm-vidprom-h3-qwenvl-cache) are fetched at pinned revisions on first start. The data is the 248,221 [rCM](https://github.com/NVlabs/rcm#dataset-downloading) VidProM prompts with their precomputed H3 text embeddings (~290 GB). No videos are needed: the student learns from its own rollouts.
+
+Set `MODEL_ROOT` and `CACHE_ROOT` to use local model and embedding copies. To prefetch them:
+
+```bash
+python scripts/download_assets.py --model-root /data/MiniMax-H3 --cache-root /data/pdmd-cache
+```
+
+**Outputs.** The student LoRA is saved every 500 iterations to `runs/pdmd_4nfe/milestones/iter_NNNNNN/student_lora.safetensors`; the reported reproduction is `iter_002500`. Re-running the command resumes from the latest state, saved every 100 iterations.
+
+**Time.** 2,500 iterations take about 20 hours on 2×8 H100 (29.5 s per iteration, 45.6 GiB peak memory per GPU). One node also works and reaches the same batch by gradient accumulation.
+
+<details>
+<summary>Recipe (<code>configs/pdmd_4nfe_544p.json</code>)</summary>
+
+| Setting | Value |
+|---|---|
+| Student / critic | two rank-128 LoRAs on one frozen base (attention and FFN projections of every block) |
+| Optimizer | AdamW, betas (0, 0.9), no weight decay, lr 5e-5 student / 1e-5 critic, gradient clip 1.0 |
+| Updates | 5 critic updates, then 1 student update; global batch 16; 2,500 iterations |
+| Clips | 124 frames at 24 fps, 544p in 20 aspect-ratio buckets |
+| Student rollout | 4 Euler steps on σ = 1, .75, .5, .25 → 0 |
+| PDMD update | DMD direction minus its component along the student–critic residual, per sample and modality |
+| DMD query | reached along the student's own prediction |
+| Losses | MSE, 0.8 per modality, clamped at 5 |
+
+The default `"method": "projected_dmd"` enables projection. Set `"method": "dmd"` in a separate
+config and pass `CONFIG=path/to/config.json` to run the unprojected control in a new output directory.
+
+</details>
+
+<details>
+<summary>Smaller GPUs</summary>
+
+The frozen base is sharded across the 8 GPUs of a node, so most memory goes to activations and optimizer states.
+Set `"optimizer_state_offload": true` in the config to target **40 GB** GPUs.
+Also use fewer `frames` (e.g. 73) or smaller `buckets` to target **32 GB** GPUs; this changes the training distribution, so expect the scores to move.
+Both are estimates from the 80 GB run, not measured runs.
+
+</details>
+
+
+### Sample a trained LoRA
+
+```bash
+python scripts/download_assets.py --model-root /data/MiniMax-H3 --eval  # text encoder and VAEs, once
+MODEL_ROOT=/data/MiniMax-H3 LORA=runs/pdmd_4nfe/milestones/iter_002500/student_lora.safetensors \
+PROMPTS=eval/prompt/prompts_vgeneval_h3pe_v2.jsonl OUT=renders/pdmd_4nfe_2500 \
+bash scripts/sample_vgeneval.sh
+```
+
+This renders the 387 VideoGen-Eval clips with the paper's settings: 4 steps at shift 12/3, seed 42, 124 frames, and each prompt's 544p size from [`configs/vgeneval_544p_sizes.json`](configs/vgeneval_544p_sizes.json).
+It runs one process per GPU, about 16 s per clip.
+`LORA` also accepts the downloaded LoRA file from [pdmd2026/pdmd_4NFE_lora](https://huggingface.co/pdmd2026/pdmd_4NFE_lora); for your own prompts, see `python scripts/infer.py --help`.
+
+
+## Evaluation
+
+See the [video guide](eval/video/README.md) for scorer setup and the [audio guide](eval/audio/README.md)
+for the existing paper audio workflow. The commands below score the training reproduction from
+the repository root. For the training audio scorer, install `requirements-audio.txt` and the
+av-benchmark checkout described below before running it. Use absolute audio input paths as shown.
+
+```bash
+# Video: Total = (4 × Quality + Semantic) / 5, from 7 VBench dimensions and 9 judged by Qwen3.8-27B
+bash eval/video/score.sh renders/pdmd_4nfe_2500/videos /path/to/Qwen3.8-27B scores/pdmd_4nfe_2500 8
+
+# Audio: PQ, CE, CU, IS, IB and DeSync
+python scripts/score_audio.py --videos "$PWD/renders/pdmd_4nfe_2500/videos" --out "$PWD/scores/pdmd_4nfe_2500/audio" \
+  --av-benchmark "$PWD/av-benchmark" --expect 387
+```
+
+The audio scorer needs a checkout of [av-benchmark](https://github.com/hkchengrex/av-benchmark) with its two weight files, once:
+
+```bash
+git clone https://github.com/hkchengrex/av-benchmark.git
+cd av-benchmark
+git checkout f351b9a6fc6abde746d5f8e1d4c47c883319cb41
+pip install -e .
+mkdir -p weights
+wget -P weights https://huggingface.co/lukewys/laion_clap/resolve/main/music_speech_audioset_epoch_15_esc_89.98.pt
+wget -P weights https://github.com/hkchengrex/MMAudio/releases/download/v0.1/synchformer_state_dict.pth
+cd ..
+```
+
+| Audio metric | Measures |
+|---|---|
+| PQ, Production Quality | clarity, no distortion or artifacts, balanced levels |
+| CE, Content Enjoyment | how pleasant or engaging the audio is |
+| CU, Content Usefulness | how usable the audio is as material for content creation |
+| IS, inception score | confidence and diversity of PaSST's AudioSet predictions |
+| IB, ImageBind score | agreement of the audio with its own video |
+| DeSync | audio–video offset in seconds predicted by Synchformer; lower is better |
+
+PQ, CE and CU come from [Audiobox Aesthetics](https://github.com/facebookresearch/audiobox-aesthetics); IS, IB and DeSync come from [av-benchmark](https://github.com/hkchengrex/av-benchmark), run as in the paper.
 
 
 ## 2-NFE samples
@@ -238,4 +404,5 @@ https://github.com/user-attachments/assets/a93db73e-84ae-4708-8e0d-c0991ff192de
 ## Acknowledgments
 
 We thank the authors of [MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) and
-[Diffusers](https://github.com/huggingface/diffusers).
+[Diffusers](https://github.com/huggingface/diffusers),
+[DiffSynth-Studio](https://github.com/modelscope/DiffSynth-Studio) and [rCM](https://github.com/NVlabs/rcm).

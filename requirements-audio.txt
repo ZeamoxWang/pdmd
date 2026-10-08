@@ -1,0 +1,6 @@
+# Audio metrics (scripts/score_audio.py), on top of requirements.txt.
+# PQ, CE and CU: Audiobox Aesthetics. IS, IB and DeSync: a source checkout of MMAudio's av-benchmark
+# at f351b9a6fc6abde746d5f8e1d4c47c883319cb41 with its weights/ (see the README's Score section).
+av
+soundfile
+audiobox_aesthetics @ git+https://github.com/facebookresearch/audiobox-aesthetics.git@2618e9d451b456e9328b39495b5e6234678aa550
