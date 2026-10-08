@@ -3,7 +3,7 @@ __pycache__/
 *.pyc
 outputs/
 .venv/
-data/
+/data/
 models/
 *.egg-info/
 .venv-training/

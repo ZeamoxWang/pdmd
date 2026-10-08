@@ -5,7 +5,7 @@
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-PDMD-blue)](https://huggingface.co/pdmd2026)
 [![Training Data](https://img.shields.io/badge/%F0%9F%A4%97%20Training-Data-orange)](https://huggingface.co/datasets/pdmd2026/rcm-vidprom-h3-qwenvl-cache)
 
-![PDMD samples](visuals/teaser.jpg)
+![PDMD samples](assets/teaser.jpg)
 
 This repo contains training, inference and evaluation code for PDMD on MiniMax-H3-33B joint
 video–audio generation. Train a four-step student from the base model, or run the released four-
@@ -34,16 +34,16 @@ This repository contains:
 
 * 🏋️ [Multi-node training](#training) of student and critic LoRAs, with automatic model and training-data downloads
 * 🪐 PDMD checkpoints at 4 NFE (full weights and LoRA) and 2 NFE (LoRA)
-* ⚡️ Inference scripts that run them on a single 24GB GPU ([`run_a10.py`](worker/run_a10.py)) or a single 80GB GPU ([`run_a100.py`](worker/run_a100.py))
-* 💥 A [tool](worker/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
-* 📊 [Video evaluation](eval/video/README.md): VBench quality and Qwen semantic scoring on 387 VideoGen-Eval prompts
-* 🔊 [Audio evaluation](eval/audio/README.md): PQ, CE, CU, IS, IB and DeSync
+* ⚡️ Inference scripts that run them on a single 24GB GPU ([`run_low_vram.py`](inference/run_low_vram.py)) or a single 80GB GPU ([`run_bf16.py`](inference/run_bf16.py))
+* 💥 A [tool](tools/checkpoints/fuse_lora.py) that fuses the PDMD LoRAs into the base transformer
+* 📊 [Video evaluation](evaluation/video/README.md): VBench quality and Qwen semantic scoring on 387 VideoGen-Eval prompts
+* 🔊 [Audio evaluation](evaluation/audio/README.md): PQ, CE, CU, IS, IB and DeSync
 
-> **Note.** The main script, `run_a10.py`, is optimized for GPUs with little memory, e.g. an NVIDIA A10
+> **Note.** The main script, `run_low_vram.py`, is optimized for GPUs with little memory, e.g. an NVIDIA A10
 > (24GB of GPU memory, with 128GB of host RAM). The script quantizes the transformer and the Qwen3-VL
 > text encoder to int8, and offloads their weights to host memory: the transformer is streamed to the
 > GPU one block at a time and the text encoder one layer at a time, and the VAE is moved to the GPU
-> only to decode. On 80GB GPUs, `run_a100.py` runs all components in bf16 instead (see
+> only to decode. On 80GB GPUs, `run_bf16.py` runs all components in bf16 instead (see
 > [Sampling](#sampling)).
 
 
@@ -63,9 +63,7 @@ Install the inference dependencies (the versions we tested):
 
 ```bash
 pip install torch==2.14.0 torchvision==0.29.0 torchaudio==2.11.0
-pip install "git+https://github.com/huggingface/diffusers.git@e0abab83b5df05de9e7abd788643c1a7c1e42e28" \
-  transformers==5.17.0 accelerate==1.15.0 peft==0.21.0 torchao==0.18.0 \
-  safetensors==0.8.0 av==18.1.0 huggingface_hub==1.33.0 pillow numpy
+pip install -r inference/requirements.txt
 ```
 
 The inference script reuses the job parsing and audio/video muxing of
@@ -109,39 +107,39 @@ The LoRAs cover the attention projections and both feed-forward layers of every 
 token-refiner block, and are fused into the base transformer once (on CPU, ~15 min):
 
 ```bash
-python worker/fuse_lora.py --lora ckpt/pdmd_4NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_4NFE_fused
-python worker/fuse_lora.py --lora ckpt/pdmd_2NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_2NFE_fused
+python tools/checkpoints/fuse_lora.py --lora ckpt/pdmd_4NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_4NFE_fused
+python tools/checkpoints/fuse_lora.py --lora ckpt/pdmd_2NFE_lora/lora_model_0.safetensors --output ckpt/pdmd_2NFE_fused
 ```
 
 
 ## Sampling
 
-Generate a video with [`worker/run_a10.py`](worker/run_a10.py), passing the PDMD transformer and the
+Generate a video with [`inference/run_low_vram.py`](inference/run_low_vram.py), passing the PDMD transformer and the
 number of steps. For example, with the 4-NFE checkpoint:
 
 ```bash
-python worker/run_a10.py \
+python inference/run_low_vram.py \
   --transformer-path ckpt/pdmd_4NFE_full --inference-steps 4 \
-  --jobs-json jobs/giant_cat_harbor_768p_4nfe.json \
+  --jobs-json inference/examples/giant_cat_harbor_768p_4nfe.json \
   --turbo-repo Minimax-H3-Turbo --output-dir outputs
 ```
 
 Use `--transformer-path ckpt/pdmd_4NFE_fused` for the 4-NFE LoRA, or
-`--transformer-path ckpt/pdmd_2NFE_fused --inference-steps 2 --jobs-json jobs/giant_cat_harbor_768p_2nfe.json`
+`--transformer-path ckpt/pdmd_2NFE_fused --inference-steps 2 --jobs-json inference/examples/giant_cat_harbor_768p_2nfe.json`
 for 2 NFE. Videos are written as `outputs/<job>_<index>_<N>nfe_seed<seed>.mp4`.
 
 **Jobs.** A job file lists prompts with their length, resolution and aspect ratio, plus an optional
-`inference_steps` (see [`jobs/`](jobs) for examples). The example jobs generate a 14.4-second,
+`inference_steps` (see [`inference/examples/`](inference/examples) for examples). The example jobs generate a 14.4-second,
 1344×768 clip of a building-sized cat over a harbor, with sound, at seed 42. Sampling uses time shift 12 for video and no
 classifier-free guidance (MiniMax-H3 is guidance-distilled).
 For 2-NFE generation, we recommend **audio time shift 6**; use **3 for paper metrics**.
 Credit to [CALMDUST (@core_tan) on X](https://x.com/core_tan) for the suggestion.
 
-**Many videos.** `run_a10.py` takes ~25–30 min to load the model. To pay that once, pass several
+**Many videos.** `run_low_vram.py` takes ~25–30 min to load the model. To pay that once, pass several
 files to `--jobs-json`, or omit it and the script keeps running as a worker that picks up job files
 dropped into `--queue-dir`.
 
-**Hardware.** `run_a10.py` is built for GPUs with 24GB of memory and needs **128GB of host RAM**: the
+**Hardware.** `run_low_vram.py` is built for GPUs with 24GB of memory and needs **128GB of host RAM**: the
 transformer and the Qwen3-VL text encoder are quantized to int8 and streamed from CPU to GPU, and the
 VAE is moved to the GPU only to decode. On an NVIDIA A10 at 1344×768 and 345 frames:
 
@@ -152,18 +150,18 @@ VAE is moved to the GPU only to decode. On an NVIDIA A10 at 1344×768 and 345 fr
 | **Per video** (model loaded) | **~31 min** | **~16–19 min** |
 | Peak GPU memory | 21 GiB | 21 GiB |
 
-**80GB GPUs.** On an 80GB GPU such as an A100 80GB, use [`worker/run_a100.py`](worker/run_a100.py),
+**80GB GPUs.** On an 80GB GPU such as an A100 80GB, use [`inference/run_bf16.py`](inference/run_bf16.py),
 which takes the same arguments:
 
 ```bash
-python worker/run_a100.py \
+python inference/run_bf16.py \
   --transformer-path ckpt/pdmd_4NFE_full --inference-steps 4 \
-  --jobs-json jobs/giant_cat_harbor_768p_4nfe.json \
+  --jobs-json inference/examples/giant_cat_harbor_768p_4nfe.json \
   --turbo-repo Minimax-H3-Turbo --output-dir outputs
 ```
 
-`run_a100.py` runs all components in bf16, without quantization, so its videos are not identical to
-those of `run_a10.py`. It moves each component to the GPU as a whole when the component runs, except
+`run_bf16.py` runs all components in bf16, without quantization, so its videos are not identical to
+those of `run_low_vram.py`. It moves each component to the GPU as a whole when the component runs, except
 the transformer, which is still streamed one block at a time because its bf16 weights plus the
 activations of a long 768p clip do not fit in 80GB (`--transformer-offload none` keeps the whole
 transformer on the GPU, for shorter or lower-resolution clips). It also needs 128GB of host RAM. On
@@ -182,20 +180,19 @@ sampling use the pinned DiffSynth-Studio MiniMax-H3 implementation. Run commands
 python3 -m venv .venv-training
 source .venv-training/bin/activate
 pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0
-pip install -r requirements.txt
+pip install -r training/requirements.txt
 pip install -e .
-python -m unittest discover -s tests -t .
 ```
 
 Install a CUDA build of PyTorch on the training machines. `flash-attn` is optional.
-For audio scoring, also run `pip install -r requirements-audio.txt`.
+For audio scoring, also run `pip install -r evaluation/audio/requirements.txt`.
 
 ### Launch and data
 
 Run on each of 2 nodes with 8 GPUs:
 
 ```bash
-OUTPUT=runs/pdmd_4nfe NNODES=2 NODE_RANK=<0|1> MASTER_ADDR=<node 0 address> bash scripts/train.sh
+OUTPUT=runs/pdmd_4nfe NNODES=2 NODE_RANK=<0|1> MASTER_ADDR=<node 0 address> bash training/launch.sh
 ```
 
 **Data downloads itself.** The base model [MiniMaxAI/MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) and the training data [pdmd2026/rcm-vidprom-h3-qwenvl-cache](https://huggingface.co/datasets/pdmd2026/rcm-vidprom-h3-qwenvl-cache) are fetched at pinned revisions on first start. The data is the 248,221 [rCM](https://github.com/NVlabs/rcm#dataset-downloading) VidProM prompts with their precomputed H3 text embeddings (~290 GB). No videos are needed: the student learns from its own rollouts.
@@ -203,7 +200,7 @@ OUTPUT=runs/pdmd_4nfe NNODES=2 NODE_RANK=<0|1> MASTER_ADDR=<node 0 address> bash
 Set `MODEL_ROOT` and `CACHE_ROOT` to use local model and embedding copies. To prefetch them:
 
 ```bash
-python scripts/download_assets.py --model-root /data/MiniMax-H3 --cache-root /data/pdmd-cache
+python tools/download_assets.py --model-root /data/MiniMax-H3 --cache-root /data/pdmd-cache
 ```
 
 **Outputs.** The student LoRA is saved every 500 iterations to `runs/pdmd_4nfe/milestones/iter_NNNNNN/student_lora.safetensors`; the reported reproduction is `iter_002500`. Re-running the command resumes from the latest state, saved every 100 iterations.
@@ -211,7 +208,7 @@ python scripts/download_assets.py --model-root /data/MiniMax-H3 --cache-root /da
 **Time.** 2,500 iterations take about 20 hours on 2×8 H100 (29.5 s per iteration, 45.6 GiB peak memory per GPU). One node also works and reaches the same batch by gradient accumulation.
 
 <details>
-<summary>Recipe (<code>configs/pdmd_4nfe_544p.json</code>)</summary>
+<summary>Recipe (<code>training/configs/pdmd_4nfe_544p.json</code>)</summary>
 
 | Setting | Value |
 |---|---|
@@ -252,9 +249,9 @@ python - <<'PYCONFIG'
 import json
 from pathlib import Path
 
-config = json.loads(Path("configs/pdmd_4nfe_544p.json").read_text())
+config = json.loads(Path("training/configs/pdmd_4nfe_544p.json").read_text())
 config["method"] = "dmd"
-Path("configs/dmd_4nfe_544p.json").write_text(json.dumps(config, indent=2) + "\n")
+Path("training/configs/dmd_4nfe_544p.json").write_text(json.dumps(config, indent=2) + "\n")
 PYCONFIG
 ```
 
@@ -262,20 +259,20 @@ Launch on both nodes, setting `NODE_RANK` to `0` or `1` and replacing `NODE0_IP`
 reachable address. Use a new output directory to start the control from the base model:
 
 ```bash
-CONFIG=configs/dmd_4nfe_544p.json OUTPUT=runs/dmd_4nfe \
-NNODES=2 NODE_RANK=0 MASTER_ADDR=NODE0_IP bash scripts/train.sh
+CONFIG=training/configs/dmd_4nfe_544p.json OUTPUT=runs/dmd_4nfe \
+NNODES=2 NODE_RANK=0 MASTER_ADDR=NODE0_IP bash training/launch.sh
 ```
 
 **Where the switch acts:**
 
-1. [Config line 2](https://github.com/ZeamoxWang/pdmd/blob/ecb36d3b01d3e8930d733a0f51e53dd2e198aa99/configs/pdmd_4nfe_544p.json#L2) sets `"method": "projected_dmd"` by default.
-2. [`scripts/train.py`, line 196](https://github.com/ZeamoxWang/pdmd/blob/ecb36d3b01d3e8930d733a0f51e53dd2e198aa99/scripts/train.py#L196) reads it:
+1. [Config line 2](https://github.com/ZeamoxWang/pdmd/blob/main/training/configs/pdmd_4nfe_544p.json#L2) sets `"method": "projected_dmd"` by default.
+2. [`training/train.py`, line 196](https://github.com/ZeamoxWang/pdmd/blob/main/training/train.py#L196) reads it:
 
    ```python
    projected = cfg.get('method', 'projected_dmd') == 'projected_dmd'
    ```
 
-3. [`pdmd_training/objectives.py`, lines 55–56](https://github.com/ZeamoxWang/pdmd/blob/ecb36d3b01d3e8930d733a0f51e53dd2e198aa99/pdmd_training/objectives.py#L55-L56)
+3. [`src/pdmd/objectives.py`, lines 55–56](https://github.com/ZeamoxWang/pdmd/blob/main/src/pdmd/objectives.py#L55-L56)
    apply the projection only when enabled:
 
    ```python
@@ -283,8 +280,8 @@ NNODES=2 NODE_RANK=0 MASTER_ADDR=NODE0_IP bash scripts/train.sh
        direction = project_update(direction, p_fake, eps)
    ```
 
-The projection itself is in [`project_update`, lines 12–25](https://github.com/ZeamoxWang/pdmd/blob/ecb36d3b01d3e8930d733a0f51e53dd2e198aa99/pdmd_training/objectives.py#L12-L25).
-To switch back to PDMD, use `CONFIG=configs/pdmd_4nfe_544p.json` and a separate output directory.
+The projection itself is in [`project_update`, lines 12–25](https://github.com/ZeamoxWang/pdmd/blob/main/src/pdmd/objectives.py#L12-L25).
+To switch back to PDMD, use `CONFIG=training/configs/pdmd_4nfe_544p.json` and a separate output directory.
 
 </details>
 
@@ -292,15 +289,15 @@ To switch back to PDMD, use `CONFIG=configs/pdmd_4nfe_544p.json` and a separate 
 ### Sample a trained LoRA
 
 ```bash
-python scripts/download_assets.py --model-root /data/MiniMax-H3 --eval  # text encoder and VAEs, once
+python tools/download_assets.py --model-root /data/MiniMax-H3 --eval  # text encoder and VAEs, once
 MODEL_ROOT=/data/MiniMax-H3 LORA=runs/pdmd_4nfe/milestones/iter_002500/student_lora.safetensors \
-PROMPTS=eval/prompt/prompts_vgeneval_h3pe_v2.jsonl OUT=renders/pdmd_4nfe_2500 \
-bash scripts/sample_vgeneval.sh
+PROMPTS=evaluation/data/vgeneval/prompts_vgeneval_h3pe_v2.jsonl OUT=renders/pdmd_4nfe_2500 \
+bash inference/sample_vgeneval.sh
 ```
 
-This renders the 387 VideoGen-Eval clips with the paper's settings: 4 steps at shift 12/3, seed 42, 124 frames, and each prompt's 544p size from [`configs/vgeneval_544p_sizes.json`](configs/vgeneval_544p_sizes.json).
+This renders the 387 VideoGen-Eval clips with the paper's settings: 4 steps at shift 12/3, seed 42, 124 frames, and each prompt's 544p size from [`evaluation/data/vgeneval/vgeneval_544p_sizes.json`](evaluation/data/vgeneval/vgeneval_544p_sizes.json).
 It runs one process per GPU, about 16 s per clip.
-`LORA` also accepts the downloaded LoRA file from [pdmd2026/pdmd_4NFE_lora](https://huggingface.co/pdmd2026/pdmd_4NFE_lora); for your own prompts, see `python scripts/infer.py --help`.
+`LORA` also accepts the downloaded LoRA file from [pdmd2026/pdmd_4NFE_lora](https://huggingface.co/pdmd2026/pdmd_4NFE_lora); for your own prompts, see `python inference/sample_diffsynth.py --help`.
 
 
 ### Training results
@@ -339,17 +336,17 @@ The full prompt is in [Lantern-head](#lantern-head).
 
 ## Evaluation
 
-See the [video guide](eval/video/README.md) for scorer setup and the [audio guide](eval/audio/README.md)
+See the [video guide](evaluation/video/README.md) for scorer setup and the [audio guide](evaluation/audio/README.md)
 for the existing paper audio workflow. The commands below score the training reproduction from
-the repository root. For the training audio scorer, install `requirements-audio.txt` and the
-av-benchmark checkout described below before running it. Use absolute audio input paths as shown.
+the repository root. For the training audio scorer, install `evaluation/audio/requirements.txt` and the
+av-benchmark checkout described below before running it.
 
 ```bash
 # Video: Total = (4 × Quality + Semantic) / 5, from 7 VBench dimensions and 9 judged by Qwen3.8-27B
-bash eval/video/score.sh renders/pdmd_4nfe_2500/videos /path/to/Qwen3.8-27B scores/pdmd_4nfe_2500 8
+bash evaluation/video/score.sh renders/pdmd_4nfe_2500/videos /path/to/Qwen3.8-27B scores/pdmd_4nfe_2500 8
 
 # Audio: PQ, CE, CU, IS, IB and DeSync
-python scripts/score_audio.py --videos "$PWD/renders/pdmd_4nfe_2500/videos" --out "$PWD/scores/pdmd_4nfe_2500/audio" \
+python evaluation/audio/score_directory.py --videos "$PWD/renders/pdmd_4nfe_2500/videos" --out "$PWD/scores/pdmd_4nfe_2500/audio" \
   --av-benchmark "$PWD/av-benchmark" --expect 387
 ```
 
