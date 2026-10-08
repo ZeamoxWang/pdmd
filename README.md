@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/a7482145-3364-46f2-9ce0-439e584de3e6
+
 ## PDMD: Projected Distribution Matching Distillation for Video Diffusion Models
 
 [![Project Page](https://img.shields.io/badge/Project-Page-yellow?logo=googlechrome&logoColor=yellow)](https://pdmd2026.github.io/)
