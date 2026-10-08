@@ -13,7 +13,7 @@ and two-step checkpoints on a single 24GB or 80GB GPU. More videos, with sound, 
 our [project page](https://pdmd2026.github.io/).
 
 [📦 Checkpoints](#pre-trained-checkpoints) · [🎬 Sampling](#sampling) · [🏋️ Training](#training) ·
-[📈 Training results](#training-results) · [📊 Evaluation](#evaluation)
+[📊 Evaluation](#evaluation) · [📚 BibTeX](#bibtex)
 
 > [**PDMD: Projected Distribution Matching Distillation for Video Diffusion Models**](https://arxiv.org/abs/2609.35768)<br>
 > Zimo Wang, Junkun Yuan, Angtian Wang, Haotian Yang, Canyu Zhang, Siyuan Yuan, Xingchang Huang,
